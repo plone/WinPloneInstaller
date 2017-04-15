@@ -1,0 +1,1 @@
+pyinstaller --add-data './*.ps1;./PS' --add-data './*.sh;./bash' -F WinPloneInstaller.py

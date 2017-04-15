@@ -21,9 +21,28 @@ class WindowsPloneInstaller:
         return var
 
     def __init__(self):
+        restartKey = r'SOFTWARE\PLONE\wslRestart'
+        try: #Check if key exists
+            k = OpenKey(HKEY_CURRENT_USER, restartKey)
 
-        requiredBuildNumber = 15063
+            restarted = QueryValue(HKEY_CURRENT_USER, restartKey)
+            self.initGUI(restarted)
 
+        except:
+            k = CreateKey(HKEY_CURRENT_USER, restartKey)
+            restarted = "0"
+            SetValue(HKEY_CURRENT_USER, restartKey, restarted)
+            self.initGUI(restarted)
+
+    def killapp(self, event):
+        sys.exit(0)
+
+    def GetFile(self, event):
+        self.fin = filedialog.askopenfilename()
+        self.filein.delete(0, 'end')
+        self.filein.insert(0, self.fin)
+
+    def initGUI(self, restarted):
         root = Tk()
         root.title("Windows Plone Installer")
         fr1 = Frame(root, width=300, height=100)
@@ -35,15 +54,29 @@ class WindowsPloneInstaller:
         fr4 = Frame(root, width=300, height=100)
         fr4.pack(side="bottom", pady=10)
 
-        Hkey = winreg.OpenKey("HKEY_CURRENT_USER\SOFTWARE\PLONE\wslRestart")
-        restarted = winreg.QueryValue(Hkey)
         if restarted == "1":
+            l = Label(fr2, text="Picking up where we left off.")
+            l.grid(sticky="NW")
+
+            ws = root.winfo_screenwidth()
+            hs = root.winfo_screenheight()
+            x = (ws/2) - (400/2)
+            y = (hs/2) - (250/2)
+            root.geometry('%dx%d+%d+%d' % (400, 250, x, y))
+
+            root.mainloop()
+
             psResult = sp.Popen([r'C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe','-ExecutionPolicy','Unrestricted','-windowstyle','hidden',base_path+'./PS/insallWSL.ps1',""],stdout = sp.PIPE,stderr = sp.PIPE)
             output, error = psResult.communicate()
             rc = psResult.returncode
-        else:
 
-            if int(platform.platform().split('.')[2].split('-')[0]) > requiredBuildNumber:
+            psResult = sp.Popen([r'C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe','-ExecutionPolicy','Unrestricted','-windowstyle','hidden',base_path+'./PS/insallPloneWSL.ps1',""],stdout = sp.PIPE,stderr = sp.PIPE)
+            output, error = psResult.communicate()
+            rc = psResult.returncode
+        else:
+            requiredBuildNumber = 15063
+            envWinBuildNumber = int(platform.platform().split('.')[2].split('-')[0])
+            if envWinBuildNumber >= requiredBuildNumber:
                 self.installType = self.make_checkbutton(fr2, "Install using Ubuntu for Windows (recommended)")
             else:
                 l = Label(fr2, text="You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
@@ -65,14 +98,6 @@ class WindowsPloneInstaller:
             root.geometry('%dx%d+%d+%d' % (400, 250, x, y))
 
             root.mainloop()
-
-    def killapp(self, event):
-        sys.exit(0)
-
-    def GetFile(self, event):
-        self.fin = filedialog.askopenfilename()
-        self.filein.delete(0, 'end')
-        self.filein.insert(0, self.fin)
         
     def initInstall(self, event):
         try:
@@ -84,6 +109,13 @@ class WindowsPloneInstaller:
         psResult = sp.Popen([r'C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe','-ExecutionPolicy','Unrestricted','-windowstyle','hidden',base_path+'./PS/installChoco.ps1',""],stdout = sp.PIPE,stderr = sp.PIPE)
         output, error = psResult.communicate()
         rc = psResult.returncode
+
+        psResult = sp.Popen([r'C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe','-ExecutionPolicy','Unrestricted','-windowstyle','hidden',base_path+'./PS/enableWSL.ps1',""],stdout = sp.PIPE,stderr = sp.PIPE)
+        output, error = psResult.communicate()
+        rc = psResult.returncode
+
+        runOnceKey = "\Software\Micosoft\Windows\CurrentVersion\RunOnce"
+        SetValue(HKEY_CURRENT_USER, restartKey, "C:\WinPloneInstaller.exe")
 
         # If debugging is needed, this should help
         #print ("Return code given to Python script is: " + str(rc))
