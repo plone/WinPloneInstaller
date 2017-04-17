@@ -1,14 +1,13 @@
 #
 # installWSL.ps1
 #
-if ((Get-WmiObject win32_operatingsystem).buildNumber -ge '14393') 
+if ((Get-WmiObject win32_operatingsystem).buildNumber -ge '15063') 
 {
-if (Invoke-Elevated (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux).State -eq "Enabled")
-{
-Invoke-Elevated lxrun /install /y
-	
-}
-else {exit 2}
+    if (Invoke-Elevated (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux).State -eq "Enabled")
+    {
+        Invoke-Elevated lxrun /install /y
+    }
+    else {exit 2}
 }
 else {exit 1} 
 
