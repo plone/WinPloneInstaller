@@ -8,5 +8,8 @@ choco feature enable -n=allowGlobalConfirmation
 choco feature enable -n=virusCheck
 choco feature enable -n=allowEmptyChecksums
 choco install pscx
-"#" | Add-Content '..\installLog.txt'
-"choco installed" | Add-Content '..\installLog.txt'
+Push-Location
+Set-Location HKCU:\Software\PLONE
+Set-ItemProperty . install_status "choco_installed"
+Pop-Location
+"Installed Chocolatey" | Add-Content 'installLog.txt'

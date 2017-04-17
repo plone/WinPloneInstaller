@@ -26,17 +26,17 @@ class WindowsPloneInstaller:
         log.write("Beginning Plone Install")
         log.close()
 
-        self.restartKey = r'SOFTWARE\PLONE\wslRestart'
+        self.ploneKey = r'SOFTWARE\PLONE'
         try: #Check if key exists
-            k = OpenKey(HKEY_CURRENT_USER, self.restartKey)
-            restarted = QueryValue(HKEY_CURRENT_USER, self.restartKey)
-            self.initGUI(restarted)
+            k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
+            installStatus = QueryValueEx(k, "install_status")[0]
+            self.initGUI(installStatus)
 
         except:
-            k = CreateKey(HKEY_CURRENT_USER, self.restartKey)
-            restarted = "0"
-            SetValue(HKEY_CURRENT_USER, self.restartKey, REG_SZ, restarted)
-            self.initGUI(restarted)
+            k = CreateKey(HKEY_CURRENT_USER, self.ploneKey)
+            installStatus = "begin"
+            SetValueEx(k, "install_status", 0, REG_SZ, installStatus)
+            self.initGUI(installStatus)
 
     def killapp(self, event):
         sys.exit(0)
@@ -46,7 +46,7 @@ class WindowsPloneInstaller:
         self.filein.delete(0, 'end')
         self.filein.insert(0, self.fin)
 
-    def initGUI(self, restarted):
+    def initGUI(self, status):
         root = Tk()
         root.title("Windows Plone Installer")
         fr1 = Frame(root, width=300, height=100)
@@ -58,7 +58,7 @@ class WindowsPloneInstaller:
         fr4 = Frame(root, width=300, height=100)
         fr4.pack(side="bottom", pady=10)
 
-        if restarted == "1":
+        if status == "wsl_enabled":
             l = Label(fr2, text="Picking up where we left off.")
             l.grid(sticky="NW")
 
@@ -117,7 +117,7 @@ class WindowsPloneInstaller:
         output, error = psResult.communicate()
         rc = psResult.returncode
 
-        self.waitFor("choco installed")
+        self.waitFor("choco_installed")
 
         if self.install_type.get():
             #Enable WSL for user's who are willing and able to install using Ubuntu/Bash
@@ -131,9 +131,6 @@ class WindowsPloneInstaller:
             installerPath = os.path.realpath(__file__)
             SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath+"\WinPloneInstaller.exe")
 
-            #we should probably set this at the end of enableWSL.ps1
-            restarted = "1"
-            SetValue(HKEY_CURRENT_USER, self.restartKey, REG_SZ, restarted)
         else:
             #Grab dependencies with Choco
             psResult = sp.Popen([r'C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe','-ExecutionPolicy','Unrestricted',self.base_path+'./PS/chocoBuildout.ps1',""],stdout = sp.PIPE,stderr = sp.PIPE)
@@ -152,14 +149,12 @@ class WindowsPloneInstaller:
         #print ("\n\nstdout:\n\n" + str(output))
         #print ("\n\nstderr: " + str(error))
 
-    def waitFor(self, line):
-        lastLine = ""
-        while lastLine != line:
-            logFile = open(self.base_path+"installLog.txt")
-            lineList = logFile.readlines()
-            print(lineList)
-            logFile.close()
-            lastLine = lineList[len(lineList)-1]
+    def waitFor(self, status):
+        installStatus = "begin" #Just saying default 'begin' for now
+        while status != installStatus:
+            k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
+            installStatus = QueryValueEx(k, "install_status")[0]
+            print(installStatus)
 
 if __name__ == "__main__":
     try:

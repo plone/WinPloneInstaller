@@ -12,9 +12,14 @@ if ((Get-WmiObject win32_operatingsystem).buildNumber -ge 15063)
 	else 
 	{
 		Enable-WindowsOptionalFeature -Online  -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux
-		New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Force | Out-Null
-		$value = "Powershell " + (Resolve-Path .\).Path + "\installWSL"
-		New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -name MyKey -propertytype String -value $value
+		#New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Force | Out-Null
+		#$value = "Powershell " + (Resolve-Path .\).Path + "\installWSL"
+		#New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -name MyKey -propertytype String -value $value
+		Push-Location
+		Set-Location HKCU:\Software\PLONE
+		Set-ItemProperty . install_status "wsl_enabled"
+		Pop-Location
+		"Windows Subsystem for Linux Enabled" | Add-Content 'installLog.txt'
 	}
 }
 else {exit 1} 
