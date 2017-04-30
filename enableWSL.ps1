@@ -1,6 +1,12 @@
 #
 # enableWSL.ps1
 #
+If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+{
+	Start-Process powershell -Verb runAs
+	Break
+}
+
 if ((Get-WmiObject win32_operatingsystem).buildNumber -ge 15063) 
 {
 	reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
@@ -12,9 +18,6 @@ if ((Get-WmiObject win32_operatingsystem).buildNumber -ge 15063)
 	else 
 	{
 		Enable-WindowsOptionalFeature -Online  -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux
-		#New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Force | Out-Null
-		#$value = "Powershell " + (Resolve-Path .\).Path + "\installWSL"
-		#New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -name MyKey -propertytype String -value $value
 		Push-Location
 		Set-Location HKCU:\Software\PLONE
 		Set-ItemProperty . install_status "wsl_enabled"
