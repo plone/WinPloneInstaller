@@ -1,7 +1,12 @@
 #
 # installChoco.ps1
 #
-if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+{
+	Start-Process powershell -Verb runAs
+	Break
+}
+
 Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy unrestricted -Force
 iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex
 choco feature enable -n=allowGlobalConfirmation

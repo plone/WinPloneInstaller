@@ -22,12 +22,12 @@ class WindowsPloneInstaller:
         #self.powershell_windowstyle = "normal"
 
         self.ploneKey = r'SOFTWARE\PLONE'
-        try: #Check if key exists
+        try: #Check if key exists, initialize with it's value if so.
             k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
             installStatus = QueryValueEx(k, "install_status")[0]
             self.initGUI(installStatus)
 
-        except:
+        except: #otherwise create it with "begin" status and initialize
             k = CreateKey(HKEY_CURRENT_USER, self.ploneKey)
             installStatus = "begin"
             SetValueEx(k, "install_status", 0, REG_SZ, installStatus)
@@ -66,6 +66,7 @@ class WindowsPloneInstaller:
                 checkbox = Checkbutton(fr2, text="Install using Ubuntu for Windows (recommended)", variable=self.install_type)
                 checkbox.grid(sticky="NW")
             else:
+                self.install_type = IntVar(value=0)
                 l = Label(fr2, text="You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
                 l.grid(sticky="NW")
 
@@ -100,14 +101,20 @@ class WindowsPloneInstaller:
             #Enable WSL for user's who are willing and able to install using Ubuntu/Bash
             rc = self.runPS("./PS/enableWSL.ps1")
 
+            self.waitFor("wsl_enabled")
+
             #Set Win Registry to load our installer after the next restart
             runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
             installerPath = os.path.realpath(__file__).split(".")[0]+".exe" #This gets a .py rather than .exe
             SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath)
 
+            #User must restart here.
+
         else:
             #Grab dependencies with Choco
             rc = self.runPS("./PS/chocoBuildout.ps1")
+
+            self.waitFor("dependencies_installed")
 
             #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
             rc = self.runPS("./PS/installPloneBuildout.ps1")
@@ -116,22 +123,12 @@ class WindowsPloneInstaller:
         #Install Ubuntu on Windows
         rc = self.runPS("./PS/installWSL.ps1")
 
-        #Run our bash script to download and run Plone's universal insatller
+        #Run our bash script to download and run Plone's universal installer
         rc = self.runPS("./PS/installPloneWSL.ps1")
 
     def runPS(self, scriptName):
         scriptPath = self.base_path + scriptName
         sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". "+scriptPath+" -ExecutionPolicy Unrestricted;"])
-        #psResult = sp.Popen([r'C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe','-ExecutionPolicy','Unrestricted',scriptPath,""],stdout = sp.PIPE,stderr = sp.PIPE)
-        #psResult.wait()
-        #psResult = sp.Popen([r'C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe','-ExecutionPolicy','Unrestricted','-windowstyle',powershell_windowstyle,base_path+'./PS/installChoco.ps1',""],stdout = sp.PIPE,stderr = sp.PIPE)
-        #output, error = psResult.communicate()
-        #rc = psResult.returncode
-
-        # If debugging is needed, this should help
-        #print ("Return code given to Python script is: " + str(rc))
-        #print ("\n\nstdout:\n\n" + str(output))
-        #print ("\n\nstderr: " + str(error))
 
     def waitFor(self, status):
         installStatus = "begin" #Just saying default 'begin' for now
