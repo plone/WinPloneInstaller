@@ -8,6 +8,14 @@ If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 	Break
 }
 
+choco install vcpython27
+choco install git
+choco install python2
+
+"Installed Plone Dependencies using Chocolatey" | Add-Content 'installLog.txt'
+Set-Location HKCU:\Software\PLONE
+Set-ItemProperty . install_status "dependencies_installed"
+
 pip install virtualenv
 git clone https://github.com/plone/simple-plone-buildout
 cd simple-plone-buildout

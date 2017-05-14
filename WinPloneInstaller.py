@@ -22,7 +22,7 @@ class WindowsPloneInstaller:
         #self.powershell_windowstyle = "normal"
 
         self.ploneKey = r'SOFTWARE\PLONE'
-        try: #Check if key exists, initialize with it's value if so.
+        try: #Check if key exists, initialize with its value if so.
             k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
             installStatus = QueryValueEx(k, "install_status")[0]
             self.initGUI(installStatus)
@@ -118,12 +118,7 @@ class WindowsPloneInstaller:
     
     def continueInstall(self):
         #Install Ubuntu on Windows
-        rc = self.runPS("./PS/installWSL.ps1")
-
-        self.waitFor("wsl_installed")
-
-        #Run our bash script to download and run Plone's universal installer
-        rc = self.runPS("./PS/installPloneWSL.ps1")
+        rc = self.runPS("./PS/installPlone.ps1")
 
     def runPS(self, scriptName):
         scriptPath = self.base_path + scriptName

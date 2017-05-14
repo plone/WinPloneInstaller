@@ -6,7 +6,7 @@ block_cipher = None
 a = Analysis(['WinPloneInstaller.py'],
              pathex=['C:\\Users\\!lucid\\Documents\\GitHub\\WinPloneInstaller'],
              binaries=[],
-             datas=[('./*.ps1', './PS'), ('./*.sh', './bash')],
+             datas=[('./PS/*', './PS'), ('./bash/*', './bash')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
@@ -25,4 +25,4 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=False , icon='plone.ico')
+          console=False , icon='resources\\plone.ico')
