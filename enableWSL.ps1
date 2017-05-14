@@ -1,11 +1,13 @@
 #
 # enableWSL.ps1
 #
-If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
-{
-	Start-Process powershell -Verb runAs
-	Break
-}
+#If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+#{
+#	Start-Process powershell -Verb runAs
+#	Break
+#}
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+
 
 if ((Get-WmiObject win32_operatingsystem).buildNumber -ge 15063) 
 {
@@ -23,6 +25,7 @@ if ((Get-WmiObject win32_operatingsystem).buildNumber -ge 15063)
 		Set-ItemProperty . install_status "wsl_enabled"
 		Pop-Location
 		"Windows Subsystem for Linux Enabled" | Add-Content 'installLog.txt'
+		Restart-Computer
 	}
 }
 else {exit 1} 

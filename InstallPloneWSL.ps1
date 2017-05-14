@@ -19,4 +19,4 @@ if ((Get-WmiObject win32_operatingsystem).buildNumber -ge '15063')
 else {exit 1} 
 
 #exit 1 - not a high enough build number to run this script
-#exit 1 - WSL is not enabled on this machine  
+#exit 2 - WSL is not enabled on this machine  

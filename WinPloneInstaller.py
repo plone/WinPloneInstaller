@@ -56,6 +56,7 @@ class WindowsPloneInstaller:
         if status == "wsl_enabled":
             l = Label(fr2, text="Picking up where we left off.")
             l.grid(sticky="NW")
+            self.continueInstall()
 
         elif status == "begin":
             requiredBuildNumber = 15063
@@ -86,9 +87,6 @@ class WindowsPloneInstaller:
         self.root.geometry('%dx%d+%d+%d' % (400, 250, x, y))
 
         self.root.mainloop()
-
-        if status == "wsl_enabled":
-            self.continueInstall(self)
         
     def initInstall(self, event):
 
@@ -98,17 +96,16 @@ class WindowsPloneInstaller:
         self.waitFor("choco_installed")
 
         if self.install_type.get():
-            #Enable WSL for user's who are willing and able to install using Ubuntu/Bash
-            rc = self.runPS("./PS/enableWSL.ps1")
-
-            self.waitFor("wsl_enabled")
-
             #Set Win Registry to load our installer after the next restart
             runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
             installerPath = os.path.realpath(__file__).split(".")[0]+".exe" #This gets a .py rather than .exe
             SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath)
 
-            #User must restart here.
+            #Enable WSL for user's who are willing and able to install using Ubuntu/Bash
+            #This script will also restart the computer.
+            rc = self.runPS("./PS/enableWSL.ps1")
+
+            self.waitFor("wsl_enabled")
 
         else:
             #Grab dependencies with Choco
@@ -122,6 +119,8 @@ class WindowsPloneInstaller:
     def continueInstall(self):
         #Install Ubuntu on Windows
         rc = self.runPS("./PS/installWSL.ps1")
+
+        self.waitFor("wsl_installed")
 
         #Run our bash script to download and run Plone's universal installer
         rc = self.runPS("./PS/installPloneWSL.ps1")
