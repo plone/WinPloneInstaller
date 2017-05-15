@@ -1,1 +1,5 @@
+It should be optional for user to see the Powershell/Bash windows pop up or just stay on the GUI
+
+Need to get a Windows 7 instance running for testing
+
 Use MarkDown for documentation

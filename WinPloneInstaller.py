@@ -1,6 +1,7 @@
 import subprocess as sp
 import os
 import platform
+import win32api
 from winreg import *
 
 try:
@@ -14,71 +15,70 @@ class WindowsPloneInstaller:
 
     def __init__(self):
         try:
-            # PyInstaller creates a temp folder and stores path in _MEIPASS
-            self.base_path = sys._MEIPASS
+            self.base_path = sys._MEIPASS  # PyInstaller creates a temp folder and stores path in _MEIPASS environment variable
         except Exception:
             self.base_path = os.path.abspath(".")
 
         #self.powershell_windowstyle = "normal"
 
-        self.ploneKey = r'SOFTWARE\PLONE'
-        try: #Check if key exists, initialize with its value if so.
+        self.ploneKey = r'SOFTWARE\Plone' #our Windows registry key under HKEY_CURRENT_USER
+
+        try: #Grab installation state from registry if it exists
             k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
-            installStatus = QueryValueEx(k, "install_status")[0]
-            self.initGUI(installStatus)
+            self.installStatus = QueryValueEx(k, "install_status")[0]
 
         except: #otherwise create it with "begin" status and initialize
             k = CreateKey(HKEY_CURRENT_USER, self.ploneKey)
-            installStatus = "begin"
-            SetValueEx(k, "install_status", 0, REG_SZ, installStatus)
-            self.initGUI(installStatus)
+            self.installStatus = "begin"
+            SetValueEx(k, "install_status", 0, REG_SZ, self.installStatus)
+            
+        self.initGUI()
 
     def killapp(self, event):
         sys.exit(0)
 
-    def GetFile(self, event):
-        self.fin = filedialog.askopenfilename()
-        self.filein.delete(0, 'end')
-        self.filein.insert(0, self.fin)
-
-    def initGUI(self, status):
+    def initGUI(self):
         self.root = Tk()
         self.root.title("Windows Plone Installer")
-        fr1 = Frame(self.root, width=300, height=100)
-        fr1.pack(side="top")
+        self.fr1 = Frame(self.root, width=300, height=100)
+        self.fr1.pack(side="top")
 
-        fr2 = Frame(self.root, width=300, height=300,
+        self.fr2 = Frame(self.root, width=300, height=300,
                     borderwidth=2, relief="ridge")
-        fr2.pack(ipadx=10, ipady=10)
-        fr4 = Frame(self.root, width=300, height=100)
-        fr4.pack(side="bottom", pady=10)
+        self.fr2.pack(ipadx=10, ipady=10)
+        self.fr4 = Frame(self.root, width=300, height=100)
+        self.fr4.pack(side="bottom", pady=10)
 
-        if status == "wsl_enabled":
-            l = Label(fr2, text="Picking up where we left off.")
+        if self.installStatus == "wsl_enabled":
+            l = Label(self.fr2, text="Picking up where we left off.")
             l.grid(sticky="NW")
             self.continueInstall()
 
-        elif status == "begin":
+        elif self.installStatus == "begin":
             requiredBuildNumber = 15063
             envWinBuildNumber = int(platform.platform().split('.')[2].split('-')[0])
 
             if envWinBuildNumber >= requiredBuildNumber:
                 self.install_type = IntVar(value=1)
-                checkbox = Checkbutton(fr2, text="Install using Ubuntu for Windows (recommended)", variable=self.install_type)
+                checkbox = Checkbutton(self.fr2, text="Install using Ubuntu for Windows (recommended)", variable=self.install_type)
                 checkbox.grid(sticky="NW")
             else:
                 self.install_type = IntVar(value=0)
-                l = Label(fr2, text="You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
+                l = Label(self.fr2, text="You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
                 l.grid(sticky="NW")
 
-            okaybutton = Button(fr4, text="Okay   ")
-            okaybutton.bind("<Button>", self.initInstall)
-            okaybutton.pack(side="left")
+        #else:
+            # This shouldn't really happen.
+            # Is another instance of the installer already running? Should we start installion over?
 
-            cancelbutton = Button(fr4, text="Cancel")
-            cancelbutton.bind("<Button>", self.killapp)
-            cancelbutton.pack(side="right")
-            self.fin = ''
+        okaybutton = Button(self.fr4, text="Okay   ")
+        okaybutton.bind("<Button>", self.initInstall)
+        okaybutton.pack(side="left")
+
+        cancelbutton = Button(self.fr4, text="Cancel")
+        cancelbutton.bind("<Button>", self.killapp)
+        cancelbutton.pack(side="right")
+        self.fin = ''
 
         ws = self.root.winfo_screenwidth()
         hs = self.root.winfo_screenheight()
@@ -90,45 +90,39 @@ class WindowsPloneInstaller:
         
     def initInstall(self, event):
 
-        #Install Chocolatey for every user
-        self.runPS("./PS/installChoco.ps1")
+        if self.install_type.get(): #if this is true, this machine has proper version for WSL route
+            self.runPS("./PS/enableWSL.ps1") #Enable WSL and restart the machine.
+            self.waitForStatusChange()
 
-        self.waitFor("choco_installed")
+            if self.installStatus == "wsl_enabled":
+                runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
+                installerPath = os.path.realpath(__file__).split(".")[0]+".exe"
+                SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath) #Set Win Registry to load our installer after the next restart
 
-        if self.install_type.get():
-            #Set Win Registry to load our installer after the next restart
-            runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
-            installerPath = os.path.realpath(__file__).split(".")[0]+".exe" #This gets a .py rather than .exe
-            SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath)
+                win32api.InitiateSystemShutdown()
+            elif self.installStatus == "wsl_installed":
+                self.continueInstall()
 
-            #Enable WSL for user's who are willing and able to install using Ubuntu/Bash
-            #This script will also restart the computer.
-            rc = self.runPS("./PS/enableWSL.ps1")
+        else: #either this machine isn't high enough version,or user has selected standard buildout route manually.
+            self.runPS("./PS/installChoco.ps1") #Chocolatey will allow us to grab dependencies.
+            self.waitForStatusChange()
 
-            self.waitFor("wsl_enabled")
-
-        else:
-            #Grab dependencies with Choco
-            rc = self.runPS("./PS/chocoBuildout.ps1")
-
-            self.waitFor("dependencies_installed")
-
-            #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
-            rc = self.runPS("./PS/installPloneBuildout.ps1")
+            if self.installStatus == "choco_installed":
+                self.runPS("./PS/installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
     
     def continueInstall(self):
-        #Install Ubuntu on Windows
-        rc = self.runPS("./PS/installPlone.ps1")
+        self.runPS("./PS/installPlone.ps1") #Install Ubuntu on Windows
 
     def runPS(self, scriptName):
         scriptPath = self.base_path + scriptName
         sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". "+scriptPath+" -ExecutionPolicy Unrestricted;"])
 
-    def waitFor(self, status):
-        installStatus = "begin" #Just saying default 'begin' for now
-        while status != installStatus:
-            k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
-            installStatus = QueryValueEx(k, "install_status")[0]
+    def waitForStatusChange(self):
+        oldStatus = self.installStatus
+        k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
+        while self.installStatus == oldStatus:
+            time.sleep(1) #to prevent this from overkill
+            self.installStatus = QueryValueEx(k, "install_status")[0]
         return
 
 if __name__ == "__main__":

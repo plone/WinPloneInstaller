@@ -1,19 +1,14 @@
 #
 # installPloneBuildout.ps1
 #
-If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
-{
-	$arguments = "& '" + $myinvocation.mycommand.definition + "'"
-	Start-Process powershell -Verb runAs -ArgumentList $arguments
-	Break
-}
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 choco install vcpython27
 choco install git
 choco install python2
 
 "Installed Plone Dependencies using Chocolatey" | Add-Content 'installLog.txt'
-Set-Location HKCU:\Software\PLONE
+Set-Location HKCU:\Software\Plone
 Set-ItemProperty . install_status "dependencies_installed"
 
 pip install virtualenv
