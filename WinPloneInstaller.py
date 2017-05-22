@@ -1,6 +1,5 @@
 import subprocess as sp
 import os
-import platform
 import win32api
 from winreg import *
 
@@ -56,7 +55,7 @@ class WindowsPloneInstaller:
 
         elif self.installStatus == "begin":
             requiredBuildNumber = 15063
-            envWinBuildNumber = int(platform.platform().split('.')[2].split('-')[0])
+            envWinBuildNumber = win32api.GetVersionEx()[2]
 
             if envWinBuildNumber >= requiredBuildNumber:
                 self.install_type = IntVar(value=1)
