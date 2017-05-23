@@ -1,14 +1,11 @@
 import subprocess as sp
 import os
 import win32api
-from winreg import *
-
-try:
-    from tkinter import *
-    from tkinter.ttk import *
-except ImportError:
-    from Tkinter import *
-    from ttk import *
+import platform
+import time
+from winreg import * #should be able to use win32api for this as well.
+from tkinter import *
+from tkinter.ttk import *
 
 class WindowsPloneInstaller:
 
@@ -31,6 +28,7 @@ class WindowsPloneInstaller:
             self.installStatus = "begin"
             SetValueEx(k, "install_status", 0, REG_SZ, self.installStatus)
             
+        self.lastStatus = self.installStatus
         self.initGUI()
 
     def killapp(self, event):
@@ -48,14 +46,18 @@ class WindowsPloneInstaller:
         self.fr4 = Frame(self.root, width=300, height=100)
         self.fr4.pack(side="bottom", pady=10)
 
+        self.statusText = StringVar()
+        self.statusText.set('Welcome to Plone Installer for Windows.')
+        statusLabel = Label(self.fr2, textvariable=self.statusText)
+        statusLabel.grid(sticky="NW")
+
         if self.installStatus == "wsl_enabled":
-            l = Label(self.fr2, text="Picking up where we left off.")
-            l.grid(sticky="NW")
-            self.continueInstall()
+            statusText.set('Picking up where we left off. Installing Linux Subsystem...')
+            self.runPS("./PS/installWSL.ps1") #Install Ubuntu on Windows
 
         elif self.installStatus == "begin":
             requiredBuildNumber = 15063
-            envWinBuildNumber = win32api.GetVersionEx()[2]
+            envWinBuildNumber = int(platform.platform().split('.')[2].split('-')[0])
 
             if envWinBuildNumber >= requiredBuildNumber:
                 self.install_type = IntVar(value=1)
@@ -63,8 +65,7 @@ class WindowsPloneInstaller:
                 checkbox.grid(sticky="NW")
             else:
                 self.install_type = IntVar(value=0)
-                l = Label(self.fr2, text="You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
-                l.grid(sticky="NW")
+                self.statusText.set("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
 
         #else:
             # This shouldn't really happen.
@@ -90,39 +91,45 @@ class WindowsPloneInstaller:
     def initInstall(self, event):
 
         if self.install_type.get(): #if this is true, this machine has proper version for WSL route
-            self.runPS("./PS/enableWSL.ps1") #Enable WSL and restart the machine.
+            self.statusText.set('Checking for Linux Subsystem')
+            self.runPS("./PS/enableWSL.ps1") #Make sure WSL is enabled and check if it is already installed
             self.waitForStatusChange()
 
             if self.installStatus == "wsl_enabled":
-                runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
-                installerPath = os.path.realpath(__file__).split(".")[0]+".exe"
-                SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath) #Set Win Registry to load our installer after the next restart
+                self.statusText.set('Linux Subsystem enabled. Must restart to install it...')
+                self.performRestart()
 
-                win32api.InitiateSystemShutdown()
             elif self.installStatus == "wsl_installed":
-                self.continueInstall()
+                self.statusText.set('Linux Subsystem already installed, installing Plone')
+                self.runPS("./PS/installPlone.ps1") #User already had WSL installed, Install Plone on existing subsystem.
 
         else: #either this machine isn't high enough version,or user has selected standard buildout route manually.
+            self.statusText.set('Installing Chocolatey package manager')
             self.runPS("./PS/installChoco.ps1") #Chocolatey will allow us to grab dependencies.
             self.waitForStatusChange()
 
             if self.installStatus == "choco_installed":
+                self.statusText.set('Chocolatey Installed...')
                 self.runPS("./PS/installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
-    
-    def continueInstall(self):
-        self.runPS("./PS/installPlone.ps1") #Install Ubuntu on Windows
 
     def runPS(self, scriptName):
         scriptPath = self.base_path + scriptName
         sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". "+scriptPath+" -ExecutionPolicy Unrestricted;"])
 
     def waitForStatusChange(self):
-        oldStatus = self.installStatus
         k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
-        while self.installStatus == oldStatus:
-            time.sleep(1) #to prevent this from overkill
+        while self.installStatus == self.lastStatus:
+            time.sleep(2) #to prevent this from overkill
             self.installStatus = QueryValueEx(k, "install_status")[0]
+        self.lastStatus = self.installStatus
         return
+
+    def performRestart(self):
+        runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
+        installerPath = os.path.realpath(__file__).split(".")[0]+".exe"
+        SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath) #Set Win Registry to load our installer after the next restart
+
+        win32api.InitiateSystemShutdown()
 
 if __name__ == "__main__":
     try:
