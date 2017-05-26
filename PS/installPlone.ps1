@@ -1,3 +1,6 @@
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
-bash -c "../bash/plone.sh"
+$ploneKey = 'HKCU:\Software\Plone'
+$tempPath = (Get-ItemProperty -Path $ploneKey -Name base_path).base_path
+Set-Location $tempPath
+bash -c "./bash/plone.sh"

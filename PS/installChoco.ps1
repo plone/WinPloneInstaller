@@ -1,6 +1,3 @@
-#
-# installChoco.ps1
-#
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy unrestricted -Force
@@ -10,7 +7,4 @@ choco feature enable -n=virusCheck
 choco feature enable -n=allowEmptyChecksums
 choco install pscx
 "Installed Chocolatey" | Add-Content 'C:\installLog.txt'
-Push-Location
-Set-Location HKCU:\Software\Plone
-Set-ItemProperty . install_status "choco_installed"
-Pop-Location
+Set-ItemProperty HKCU:\Software\Plone install_status "choco_installed"

@@ -1,6 +1,3 @@
-#
-# installPloneBuildout.ps1
-#
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 choco install vcpython27
@@ -8,8 +5,7 @@ choco install git
 choco install python2
 
 "Installed Plone Dependencies using Chocolatey" | Add-Content 'installLog.txt'
-Set-Location HKCU:\Software\Plone
-Set-ItemProperty . install_status "dependencies_installed"
+Set-ItemProperty HKCU:\Software\Plone install_status "dependencies_installed"
 
 pip install virtualenv
 git clone https://github.com/plone/simple-plone-buildout

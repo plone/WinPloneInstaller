@@ -3,8 +3,7 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 if (Invoke-Elevated (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux).State -eq "Enabled") {
     Invoke-Elevated lxrun /install /y
     "Windows Subsystem for Linux Installed" | Add-Content 'C:\installLog.txt'
-    Set-Location HKCU:\Software\Plone
-    Set-ItemProperty . install_status "wsl_installed"
+    Set-ItemProperty HKCU:\Software\Plone install_status "wsl_installed"
 } else {exit 1}
 
 #exit 1 - WSL is not enabled on this machine  

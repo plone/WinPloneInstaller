@@ -3,7 +3,7 @@ import os
 import win32api
 import platform
 import time
-from winreg import * #should be able to use win32api for this as well.
+from winreg import * #should be able to use win32api for these features as well.
 from tkinter import *
 from tkinter.ttk import *
 
@@ -15,19 +15,19 @@ class WindowsPloneInstaller:
         except Exception:
             self.base_path = os.path.abspath(".")
 
-        #self.powershell_windowstyle = "normal"
-
         self.ploneKey = r'SOFTWARE\Plone' #our Windows registry key under HKEY_CURRENT_USER
 
         try: #Grab installation state from registry if it exists
             k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
             self.installStatus = QueryValueEx(k, "install_status")[0]
 
-        except: #otherwise create it with "begin" status and initialize
+        except: #Otherwise create it with ititial "begin" value
             k = CreateKey(HKEY_CURRENT_USER, self.ploneKey)
             self.installStatus = "begin"
             SetValueEx(k, "install_status", 0, REG_SZ, self.installStatus)
-            
+
+        SetValueEx(k, "base_path", 0,REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
+
         self.lastStatus = self.installStatus
         self.initGUI()
 
@@ -103,6 +103,8 @@ class WindowsPloneInstaller:
                 self.statusText.set('Linux Subsystem already installed, installing Plone')
                 self.runPS("./PS/installPlone.ps1") #User already had WSL installed, Install Plone on existing subsystem.
 
+            #else: problem occured
+
         else: #either this machine isn't high enough version,or user has selected standard buildout route manually.
             self.statusText.set('Installing Chocolatey package manager')
             self.runPS("./PS/installChoco.ps1") #Chocolatey will allow us to grab dependencies.
@@ -112,11 +114,15 @@ class WindowsPloneInstaller:
                 self.statusText.set('Chocolatey Installed...')
                 self.runPS("./PS/installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
 
+                self.waitForStatusChange()
+
+            #else: problem occured
+
     def runPS(self, scriptName):
         scriptPath = self.base_path + scriptName
-        sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". "+scriptPath+" -ExecutionPolicy Unrestricted;"])
+        sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". "+scriptPath+" -ExecutionPolicy Unrestricted -windowstyle hidden;"])
 
-    def waitForStatusChange(self):
+    def waitForStatusChange(self): #add a timeout here in case, for example, powershell crashes before updating status
         k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
         while self.installStatus == self.lastStatus:
             time.sleep(2) #to prevent this from overkill
