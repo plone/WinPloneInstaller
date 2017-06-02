@@ -1,0 +1,8 @@
+<h1 id="project-build-debugging-suggestions">Project Build Debugging Suggestions</h1>
+
+<p>When building the Windows Plone Installer there are some things to keep in mind.</p>
+
+<ul>
+<li>Any error outputs from PyInstaller that seem to be involved with your Python code can be addressed more directly by trying to run the script directly in Python.</li>
+<li>The Windows registry effects the environment! If you are having trouble building, try deleting the PloneInstaller key using regedit and see if you get a different result.</li>
+</ul>

@@ -8,6 +8,7 @@ if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem
 	} else { #WinPloneInstaller.py will call installPlone.ps1
 		Set-ItemProperty HKCU:\Software\Plone install_status "wsl_enabled"
 		"Windows Subsystem for Linux Enabled" | Add-Content 'installLog.txt'
+		Restart-Computer
 	}
 } else {
 	Enable-WindowsOptionalFeature -Online  -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux

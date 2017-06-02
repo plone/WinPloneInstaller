@@ -1,9 +1,9 @@
 import subprocess as sp
 import os
-import win32api
-import platform
+# import win32api
+# import platform
 import time
-from winreg import * #should be able to use win32api for these features as well.
+from winreg import *
 from tkinter import *
 from tkinter.ttk import *
 
@@ -19,16 +19,16 @@ class WindowsPloneInstaller:
 
         try: #Grab installation state from registry if it exists
             k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
-            self.installStatus = QueryValueEx(k, "install_status")[0]
+            self.install_status = QueryValueEx(k, "install_status")[0]
 
         except: #Otherwise create it with ititial "begin" value
             k = CreateKey(HKEY_CURRENT_USER, self.ploneKey)
-            self.installStatus = "begin"
-            SetValueEx(k, "install_status", 0, REG_SZ, self.installStatus)
+            self.install_status = "begin"
+            SetValueEx(k, "install_status", 0, REG_SZ, self.install_status)
 
         SetValueEx(k, "base_path", 0,REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
 
-        self.lastStatus = self.installStatus
+        self.lastStatus = self.install_status
         self.initGUI()
 
     def killapp(self, event):
@@ -51,21 +51,27 @@ class WindowsPloneInstaller:
         statusLabel = Label(self.fr2, textvariable=self.statusText)
         statusLabel.grid(sticky="NW")
 
-        if self.installStatus == "wsl_enabled":
+        if self.install_status == "wsl_enabled":
             statusText.set('Picking up where we left off. Installing Linux Subsystem...')
             self.runPS("./PS/installWSL.ps1") #Install Ubuntu on Windows
 
-        elif self.installStatus == "begin":
+        elif self.install_status == "begin":
             requiredBuildNumber = 15063
-            envWinBuildNumber = int(platform.platform().split('.')[2].split('-')[0])
+            self.runPS("./PS/getWinInfo.ps1")
+            self.waitForStatusChange()
 
-            if envWinBuildNumber >= requiredBuildNumber:
-                self.install_type = IntVar(value=1)
-                checkbox = Checkbutton(self.fr2, text="Install using Ubuntu for Windows (recommended)", variable=self.install_type)
-                checkbox.grid(sticky="NW")
-            else:
-                self.install_type = IntVar(value=0)
-                self.statusText.set("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
+            if self.install_status == "got_win_info":
+                k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
+                
+                envWinBuildNumber = int(str(QueryValueEx(k, "win_version")).split('.')[2])
+
+                if envWinBuildNumber >= requiredBuildNumber:
+                    self.install_type = IntVar(value=1)
+                    checkbox = Checkbutton(self.fr2, text="Install using Ubuntu for Windows (recommended)", variable=self.install_type)
+                    checkbox.grid(sticky="NW")
+                else:
+                    self.install_type = IntVar(value=0)
+                    self.statusText.set("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
 
         #else:
             # This shouldn't really happen.
@@ -93,13 +99,16 @@ class WindowsPloneInstaller:
         if self.install_type.get(): #if this is true, this machine has proper version for WSL route
             self.statusText.set('Checking for Linux Subsystem')
             self.runPS("./PS/enableWSL.ps1") #Make sure WSL is enabled and check if it is already installed
+            runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
+            installerPath = os.path.realpath(__file__).split(".")[0]+".exe"
+            SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath) #Set Win Registry to load our installer after the next restart
             self.waitForStatusChange()
 
-            if self.installStatus == "wsl_enabled":
+            if self.install_status == "wsl_enabled":
                 self.statusText.set('Linux Subsystem enabled. Must restart to install it...')
-                self.performRestart()
+                # self.performRestart()
 
-            elif self.installStatus == "wsl_installed":
+            elif self.install_status == "wsl_installed":
                 self.statusText.set('Linux Subsystem already installed, installing Plone')
                 self.runPS("./PS/installPlone.ps1") #User already had WSL installed, Install Plone on existing subsystem.
 
@@ -110,7 +119,7 @@ class WindowsPloneInstaller:
             self.runPS("./PS/installChoco.ps1") #Chocolatey will allow us to grab dependencies.
             self.waitForStatusChange()
 
-            if self.installStatus == "choco_installed":
+            if self.install_status == "choco_installed":
                 self.statusText.set('Chocolatey Installed...')
                 self.runPS("./PS/installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
 
@@ -124,18 +133,18 @@ class WindowsPloneInstaller:
 
     def waitForStatusChange(self): #add a timeout here in case, for example, powershell crashes before updating status
         k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
-        while self.installStatus == self.lastStatus:
+        while self.install_status == self.lastStatus:
             time.sleep(2) #to prevent this from overkill
-            self.installStatus = QueryValueEx(k, "install_status")[0]
-        self.lastStatus = self.installStatus
+            self.install_status = QueryValueEx(k, "install_status")[0]
+        self.lastStatus = self.install_status
         return
 
-    def performRestart(self):
-        runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
-        installerPath = os.path.realpath(__file__).split(".")[0]+".exe"
-        SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath) #Set Win Registry to load our installer after the next restart
+    # def performRestart(self):
+        # runOnceKey = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
+        # installerPath = os.path.realpath(__file__).split(".")[0]+".exe"
+        # SetValue(HKEY_CURRENT_USER, runOnceKey, REG_SZ,installerPath) #Set Win Registry to load our installer after the next restart
 
-        win32api.InitiateSystemShutdown()
+        # win32api.InitiateSystemShutdown()
 
 if __name__ == "__main__":
     try:
