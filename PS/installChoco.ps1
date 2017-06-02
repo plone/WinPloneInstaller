@@ -7,4 +7,4 @@ choco feature enable -n=virusCheck
 choco feature enable -n=allowEmptyChecksums
 choco install pscx
 "Installed Chocolatey" | Add-Content 'C:\installLog.txt'
-Set-ItemProperty HKCU:\Software\Plone install_status "choco_installed"
+Set-ItemProperty HKCU:\Software\PloneInstaller install_status "choco_installed"

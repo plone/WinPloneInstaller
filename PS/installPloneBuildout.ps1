@@ -5,7 +5,7 @@ choco install git
 choco install python2
 
 "Installed Plone Dependencies using Chocolatey" | Add-Content 'installLog.txt'
-Set-ItemProperty HKCU:\Software\Plone install_status "dependencies_installed"
+Set-ItemProperty HKCU:\Software\PloneInstaller install_status "dependencies_installed"
 
 pip install virtualenv
 git clone https://github.com/plone/simple-plone-buildout

@@ -15,7 +15,7 @@ class WindowsPloneInstaller:
         except Exception:
             self.base_path = os.path.abspath(".")
 
-        self.ploneKey = r'SOFTWARE\Plone' #our Windows registry key under HKEY_CURRENT_USER
+        self.ploneKey = r'SOFTWARE\PloneInstaller' #our Windows registry key under HKEY_CURRENT_USER
 
         try: #Grab installation state from registry if it exists
             k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)

@@ -3,15 +3,15 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
 if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux).State -eq "Enabled") {
 	if (Get-Command bash -ErrorAction SilentlyContinue) { # WSL is already installed...will not override current setup, just run plone.sh
-		Set-ItemProperty HKCU:\Software\Plone install_status "wsl_installed"
+		Set-ItemProperty HKCU:\Software\PloneInstaller install_status "wsl_installed"
 		"Windows Subsystem for Linux Enabled" | Add-Content 'installLog.txt'
 	} else { #WinPloneInstaller.py will call installPlone.ps1
-		Set-ItemProperty HKCU:\Software\Plone install_status "wsl_enabled"
+		Set-ItemProperty HKCU:\Software\PloneInstaller install_status "wsl_enabled"
 		"Windows Subsystem for Linux Enabled" | Add-Content 'installLog.txt'
 		Restart-Computer
 	}
 } else {
 	Enable-WindowsOptionalFeature -Online  -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux
-	Set-ItemProperty HKCU:\Software\Plone install_status "wsl_enabled"
+	Set-ItemProperty HKCU:\Software\PloneInstaller install_status "wsl_enabled"
 	"Windows Subsystem for Linux Enabled" | Add-Content 'installLog.txt'
 }
