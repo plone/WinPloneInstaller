@@ -14,3 +14,5 @@ WinPloneInstaller.py contains the main logic of the installer. PyInstaller is us
         - Install Chocolately (a software manager for Windows)
         - Use Chololately to install Python, Git, etc.
         - Run buildout
+
+The process is generally to call out (to PowerShell for example) for an action, and then wait for the Windows registry to reflect progress. waitForStatusChange(timeout) function takes an integer and allows that many attempts in reading the registry for status updates. There is a 2 second pause in the registry query code to prevent an overflow of registry reads, so currently a timeout value of 15 attempts will leave around 30 seconds for the external process to complete. waitforStatusChange(timeout) is generally called after each call to runPS(scriptName) 

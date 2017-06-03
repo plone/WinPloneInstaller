@@ -15,3 +15,4 @@
 ## Dependencies and Tools used to build the project:
 [PyInstaller](pyinstaller.html)
 [Windows Subsystem for Linux](WSL.html)
+[Chocolatey](Chocolatey.html)
