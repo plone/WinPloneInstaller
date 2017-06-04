@@ -133,9 +133,10 @@ class WindowsPloneInstaller:
 
             elif self.install_status == "timed_out":
                 print("Installer process timed out!")
+
     def runPS(self, scriptName):
         scriptPath = self.base_path + scriptName
-        sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". "+scriptPath+" -ExecutionPolicy Unrestricted -windowstyle hidden;"])
+        sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". "+scriptPath+" -ExecutionPolicy Unrestricted -windowstyle hidden;"]) #these -options aren't actually working.
 
     def waitForStatusChange(self, timeout): #add a timeout here in case, for example, powershell crashes before updating status
         k = OpenKey(HKEY_CURRENT_USER, self.ploneKey)
