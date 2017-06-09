@@ -1,7 +1,5 @@
 import subprocess as sp
 import os
-# import win32api
-# import platform
 import time
 from winreg import *
 from tkinter import *
@@ -15,10 +13,13 @@ class WindowsPloneInstaller:
         except Exception:
             self.base_path = os.path.abspath(".")
 
-        self.installer_path = os.path.realpath(__file__).split(".")[0]+".exe"
-
         self.plone_key = r'SOFTWARE\PloneInstaller' #our Windows registry key under HKEY_CURRENT_USER
         self.run_once_key = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
+
+        self.installer_path = os.path.realpath(__file__).split(".")[0]+".exe"
+        self.log_file = os.path.dirname(self.installer_path) + "\install.log"
+        print(self.log_file)
+        self.log("Initializing installer")
 
         self.required_build = 15063
 
@@ -32,6 +33,7 @@ class WindowsPloneInstaller:
             SetValueEx(k, "install_status", 0, REG_SZ, self.install_status)
 
         SetValueEx(k, "base_path", 0,REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
+        SetValueEx(k, "installer_path", 0, REG_SZ, os.path.dirname(self.installer_path))
 
         self.last_status = self.install_status
         self.init_GUI()
@@ -155,6 +157,10 @@ class WindowsPloneInstaller:
                 break
         self.last_status = self.install_status
         return
+
+    def log(self, message):
+        with open(self.log_file, "a") as log:
+            log.write(message)
 
 if __name__ == "__main__":
     try:
