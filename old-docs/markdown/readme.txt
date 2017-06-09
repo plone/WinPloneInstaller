@@ -1,1 +1,0 @@
-Created using stackedit.io services, beginning May 2017
