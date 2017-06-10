@@ -18,8 +18,6 @@ class WindowsPloneInstaller:
 
         self.installer_path = os.path.realpath(__file__).split(".")[0]+".exe"
         self.log_file = os.path.dirname(self.installer_path) + "\install.log"
-        print(self.log_file)
-        self.log("Initializing installer")
 
         self.required_build = 15063
 
@@ -42,24 +40,26 @@ class WindowsPloneInstaller:
         sys.exit(0)
 
     def init_GUI(self):
-        self.root = Tk()
-        self.root.title("Windows Plone Installer")
-        self.fr1 = Frame(self.root, width=300, height=100)
+        self.gui = Tk()
+        self.gui.title("Windows Plone Installer")
+        window_width = 500
+        window_height = 275
+        self.fr1 = Frame(self.gui, width=window_width, height=window_height)
         self.fr1.pack(side="top")
 
-        self.fr2 = Frame(self.root, width=300, height=300,
-                    borderwidth=2, relief="ridge")
-        self.fr2.pack(ipadx=10, ipady=10)
-        self.fr4 = Frame(self.root, width=300, height=100)
-        self.fr4.pack(side="bottom", pady=10)
+        self.log_text = Text(self.fr1, borderwidth=3, relief="sunken",spacing1=1, height=8, width=50, bg="black", fg="white")
+        self.log_text.config(font=("consolas", 12), undo=True, wrap='word')
+        self.log_text.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
-        self.status_text = StringVar()
-        self.status_text.set('Welcome to Plone Installer for Windows.')
-        statusLabel = Label(self.fr2, textvariable=self.status_text)
-        statusLabel.grid(sticky="NW")
+        scrollb = Scrollbar(self.fr1, command=self.log_text.yview)
+        scrollb.grid(row=0, column=1, sticky='nsew')
+        self.log_text['yscrollcommand'] = scrollb.set
+
+        self.log("Initializing installer.")
+        self.log("Welcome to Plone Installer for Windows.")
 
         if self.install_status == "wsl_enabled":
-            self.status_text.set('Picking up where we left off. Installing Linux Subsystem...')
+            self.log("Picking up where we left off. Installing Linux Subsystem...")
             self.run_PS("./PS/installWSL.ps1") #Install Ubuntu on Windows
             self.wait_for_status_change(5000) # Not sure how long this takes
 
@@ -81,61 +81,64 @@ class WindowsPloneInstaller:
 
                 if env_build >= self.required_build:
                     self.install_type = IntVar(value=1)
-                    checkbox = Checkbutton(self.fr2, text="Install using Ubuntu for Windows (recommended)", variable=self.install_type)
-                    checkbox.grid(sticky="NW")
+                    Checkbutton(self.fr1, text="Install using Ubuntu for Windows (recommended)", variable=self.install_type).grid(row=1,sticky="NW")
                 else:
                     self.install_type = IntVar(value=0)
-                    self.status_text.set("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
+                    self.log("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
 
         #else:
             # This shouldn't really happen.
             # Is another instance of the installer already running? Should we start installion over?
 
-        okaybutton = Button(self.fr4, text="Okay   ")
+        okaybutton = Button(self.fr1, text="Okay")
+        okaybutton.grid(row=2, sticky="WE")
         okaybutton.bind("<Button>", self.init_install)
-        okaybutton.pack(side="left")
 
-        cancelbutton = Button(self.fr4, text="Cancel")
+        cancelbutton = Button(self.fr1, text="Cancel")
+        cancelbutton.grid(row=3, sticky="WE")
         cancelbutton.bind("<Button>", self.killapp)
-        cancelbutton.pack(side="right")
         self.fin = ''
 
-        ws = self.root.winfo_screenwidth()
-        hs = self.root.winfo_screenheight()
-        x = (ws/2) - (400/2)
-        y = (hs/2) - (250/2)
-        self.root.geometry('%dx%d+%d+%d' % (400, 250, x, y))
+        ws = self.gui.winfo_screenwidth()
+        hs = self.gui.winfo_screenheight()
+        x = (ws/2) - (window_width/2)
+        y = (hs/2) - (window_height/2)
+        self.gui.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
 
-        self.root.mainloop()
+        self.gui.mainloop()
         
     def init_install(self, event):
 
         if self.install_type.get(): #if this is true, this machine has proper version for WSL route
-            self.status_text.set('Checking for Linux Subsystem')
+            self.log('Checking for Linux Subsystem')
             SetValue(HKEY_CURRENT_USER, self.run_once_key, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the next restart
             self.run_PS("./PS/enableWSL.ps1") #Make sure WSL is enabled and check if it is already installed
             self.wait_for_status_change(15)
 
             if self.install_status == "wsl_enabled":
-                self.status_text.set('Linux Subsystem enabled. Must restart to install it...')
+                self.log('Linux Subsystem enabled. Must restart to install it!')
 
             elif self.install_status == "wsl_installed":
-                self.status_text.set('Linux Subsystem already installed, installing Plone')
+                self.log('Linux Subsystem already installed, installing Plone')
                 self.run_PS("./PS/installPlone.ps1") #User already had WSL installed, Install Plone on existing subsystem.
 
             elif self.install_status == "timed_out":
                 print("Installer process timed out!")
 
         else: #either this machine isn't high enough version,or user has selected standard buildout route manually.
-            self.status_text.set('Installing Chocolatey package manager')
+            self.log('Installing Chocolatey package manager')
             self.run_PS("./PS/installChoco.ps1") #Chocolatey will allow us to grab dependencies.
             self.wait_for_status_change(90)
 
             if self.install_status == "choco_installed":
-                self.status_text.set('Chocolatey Installed...')
+                self.log('Chocolatey Installed')
+                self.log('Installing Plone Dependencies using Chocolatey')
                 self.run_PS("./PS/installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
 
                 self.wait_for_status_change(5000) #Not sure how long this takes
+
+                if self.install_status == "dependencies_installed":
+                    self.log("Dependencies installed.")
 
             elif self.install_status == "timed_out":
                 print("Installer process timed out!")
@@ -160,7 +163,10 @@ class WindowsPloneInstaller:
 
     def log(self, message):
         with open(self.log_file, "a") as log:
-            log.write(message)
+            log.write(message+"\n")
+        self.log_text.config(state="normal")
+        self.log_text.insert(END, "> " + message + '\n')
+        self.log_text.config(state="disabled")
 
 if __name__ == "__main__":
     try:
