@@ -5,4 +5,5 @@ sudo apt-get -y install libreadline-dev wv poppler-utils
 wget --no-check-certificate "https://launchpad.net/plone/5.0/5.0.7/+download/Plone-5.0.7-UnifiedInstaller.tgz" # Remember it's possible for wget to not be available
 tar -xf ./Plone-5.0.7-UnifiedInstaller.tgz
 cd ./Plone-5.0.7-UnifiedInstaller
-./install.sh
+sudo ./install.sh --password=admin --target=/etc/Plone
+/etc/Plone/zinstance/bin/plonectl start

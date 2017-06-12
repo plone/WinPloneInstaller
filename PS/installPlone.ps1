@@ -4,3 +4,4 @@ $ploneKey = 'HKCU:\Software\PloneInstaller'
 $tempPath = (Get-ItemProperty -Path $ploneKey -Name base_path).base_path
 Set-Location $tempPath
 bash -c "./bash/plone.sh"
+Set-ItemProperty HKCU:\Software\PloneInstaller install_status "complete"

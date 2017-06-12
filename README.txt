@@ -1,5 +1,5 @@
 Steps for creating installer EXE with PyInstaller
-	Get python (currently building on 2.7)
+	Get python (currently building on 3.5)
 	Make sure pip is installed and accessible from powershell
 	Run "pip install pyinstaller"
 	Be sure python-tk package is installed for GUI (hit and miss for me whether I had to do this manually)

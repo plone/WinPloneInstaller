@@ -22,16 +22,17 @@ class WindowsPloneInstaller:
         self.required_build = 15063
 
         try: #Grab installation state from registry if it exists
-            k = OpenKey(HKEY_CURRENT_USER, self.plone_key)
+            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
             self.install_status = QueryValueEx(k, "install_status")[0]
 
         except: #Otherwise create it with ititial "begin" value
             k = CreateKey(HKEY_CURRENT_USER, self.plone_key)
             self.install_status = "begin"
-            SetValueEx(k, "install_status", 0, REG_SZ, self.install_status)
+            SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
 
-        SetValueEx(k, "base_path", 0,REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
-        SetValueEx(k, "installer_path", 0, REG_SZ, os.path.dirname(self.installer_path))
+        SetValueEx(k, "base_path", 1,REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
+        SetValueEx(k, "installer_path", 1, REG_SZ, os.path.dirname(self.installer_path))
+        CloseKey(k)
 
         self.last_status = self.install_status
         self.init_GUI()
@@ -60,18 +61,17 @@ class WindowsPloneInstaller:
 
         if self.install_status == "wsl_enabled":
             self.log("Picking up where we left off. Installing Linux Subsystem...")
-            self.run_PS("./PS/installWSL.ps1") #Install Ubuntu on Windows
+            self.run_PS("installWSL.ps1") #Install Ubuntu on Windows
             self.wait_for_status_change(5000) # Not sure how long this takes
 
             if self.install_status == "wsl_installed":
-                self.run_PS("./PS/installPlone.ps1") #Install Plone on the new instance of WSL
-                self.wait_for_status_change(5000) # Not sure how long this takes
+                self.install_on_wsl()
 
-            elif self.install_status == "timed_out":
-                print("Installer process timed out!")
+            else:
+                self.catch()
 
         elif self.install_status == "begin":
-            self.run_PS("./PS/getWinInfo.ps1")
+            self.run_PS("getWinInfo.ps1")
             self.wait_for_status_change(10)
 
             if self.install_status == "got_win_info":
@@ -90,9 +90,9 @@ class WindowsPloneInstaller:
             # This shouldn't really happen.
             # Is another instance of the installer already running? Should we start installion over?
 
-        okaybutton = Button(self.fr1, text="Okay")
-        okaybutton.grid(row=2, sticky="WE")
-        okaybutton.bind("<Button>", self.init_install)
+        self.okaybutton = Button(self.fr1, text="Okay")
+        self.okaybutton.grid(row=2, sticky="WE")
+        self.okaybutton.bind("<Button>", self.init_install)
 
         cancelbutton = Button(self.fr1, text="Cancel")
         cancelbutton.grid(row=3, sticky="WE")
@@ -109,10 +109,12 @@ class WindowsPloneInstaller:
         
     def init_install(self, event):
 
+        self.okaybutton.configure(state="disabled")
+
         if self.install_type.get(): #if this is true, this machine has proper version for WSL route
             self.log('Checking for Linux Subsystem')
-            SetValue(HKEY_CURRENT_USER, self.run_once_key, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the next restart
-            self.run_PS("./PS/enableWSL.ps1") #Make sure WSL is enabled and check if it is already installed
+            SetValueEx(HKEY_CURRENT_USER, self.run_once_key, 0, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the next restart
+            self.run_PS("enableWSL.ps1") #Make sure WSL is enabled and check if it is already installed
             self.wait_for_status_change(15)
 
             if self.install_status == "wsl_enabled":
@@ -120,36 +122,63 @@ class WindowsPloneInstaller:
 
             elif self.install_status == "wsl_installed":
                 self.log('Linux Subsystem already installed, installing Plone')
-                self.run_PS("./PS/installPlone.ps1") #User already had WSL installed, Install Plone on existing subsystem.
+                self.install_on_wsl()
 
-            elif self.install_status == "timed_out":
-                print("Installer process timed out!")
+            else:
+                catch()
 
         else: #either this machine isn't high enough version,or user has selected standard buildout route manually.
             self.log('Installing Chocolatey package manager')
-            self.run_PS("./PS/installChoco.ps1") #Chocolatey will allow us to grab dependencies.
+            self.run_PS("installChoco.ps1") #Chocolatey will allow us to grab dependencies.
             self.wait_for_status_change(90)
 
             if self.install_status == "choco_installed":
                 self.log('Chocolatey Installed')
                 self.log('Installing Plone Dependencies using Chocolatey')
-                self.run_PS("./PS/installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
+                self.run_PS("installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
 
-                self.wait_for_status_change(5000) #Not sure how long this takes
+                self.wait_for_status_change(300)
 
                 if self.install_status == "dependencies_installed":
                     self.log("Dependencies installed.")
+                    self.log("Preparing virtualenv and gathering Plone buildout from GitHub.")
+                    self.wait_for_status_change(500)
 
-            elif self.install_status == "timed_out":
-                print("Installer process timed out!")
+                    if self.install_status == "starting_buildout":
+                        self.log("Running buildout, this may take a while...")
+
+                        self.wait_for_status_change(5000) #Not sure how long this takes
+
+                        if self.install_status == "complete":
+                            log("Plone installed successfully!")
+                            self.clean_up()
+                        else:
+                            self.catch()
+                    else:
+                        self.catch()
+                else:
+                    self.catch()
+            else:
+                self.catch()
+
+    def install_on_wsl(self):
+        self.run_PS("installPlone.ps1") #Install Plone on the new instance of WSL
+        self.wait_for_status_change(150) # Not sure how long this takes
+
+        if self.install_status == "complete":
+            log("Plone installed successfully on Linux subsystem!")
+            self.clean_up()
+        else:
+            catch()
 
     def run_PS(self, script_name):
-        script_path = self.base_path + script_name
+        script_path = self.base_path+"\\PS\\"+script_name
+        self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
         #sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path, "-ExecutionPolicy", "Unrestricted", "-windowstyle", "hidden;"]) #these -options aren't actually working.
-        sp.run(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path, "-ExecutionPolicy", "Unrestricted", "-windowstyle", "hidden;"])
+        sp.run(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path, "-ExecutionPolicy", "Unrestricted", "-windowstyle", "hidden"])
 
     def wait_for_status_change(self, timeout): #add a timeout here in case, for example, powershell crashes before updating status
-        k = OpenKey(HKEY_CURRENT_USER, self.plone_key)
+        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
         count = 0
         while self.install_status == self.last_status:
             time.sleep(2) #to prevent this from overkill
@@ -159,7 +188,12 @@ class WindowsPloneInstaller:
                 self.install_status = "timed_out"
                 break
         self.last_status = self.install_status
+        CloseKey(k)
         return
+
+    def catch(self):
+        if self.install_status == "timed_out":
+                print("Installer process timed out!")
 
     def log(self, message):
         with open(self.log_file, "a") as log:
@@ -167,6 +201,16 @@ class WindowsPloneInstaller:
         self.log_text.config(state="normal")
         self.log_text.insert(END, "> " + message + '\n')
         self.log_text.config(state="disabled")
+        self.log_text.see(END)
+
+    def clean_up(self):
+        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+        DeleteKey(k, "install_status")
+        DeleteKey(k, "base_path")
+        DeleteKey(k, "installer_path")
+        DeleteKey(k, "win_version")
+        CloseKey(k)
+        DeleteKey(HKEY_CURRENT_USER, self.plone_key)
 
 if __name__ == "__main__":
     try:

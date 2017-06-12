@@ -1,1 +1,3 @@
 It should be optional for user to see the Powershell/Bash windows pop up or just stay on the GUI
+
+Need to add option to install the developer tools with bin/buildout -c develop.cfg

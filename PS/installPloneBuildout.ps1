@@ -8,10 +8,10 @@ choco install pscx
 choco install vcpython27
 choco install git
 choco install python2
+pip install virtualenv
 
 Set-ItemProperty HKCU:\Software\PloneInstaller install_status "dependencies_installed"
 
-pip install virtualenv
 git clone https://github.com/plone/simple-plone-buildout
 cd simple-plone-buildout
 copy profiles\buildout.cfg.tmpl buildout.cfg
