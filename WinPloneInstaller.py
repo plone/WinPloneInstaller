@@ -56,21 +56,25 @@ class WindowsPloneInstaller:
         scrollb.grid(row=0, column=1, sticky='nsew')
         self.log_text['yscrollcommand'] = scrollb.set
 
+        self.okaybutton = Button(self.fr1, text="Okay")
+        self.okaybutton.grid(row=2, sticky="WE")
+        self.okaybutton.bind("<Button>", self.okay_handler)
+
+        cancelbutton = Button(self.fr1, text="Cancel")
+        cancelbutton.grid(row=3, sticky="WE")
+        cancelbutton.bind("<Button>", self.killapp)
+        self.fin = ''
+
+        ws = self.gui.winfo_screenwidth()
+        hs = self.gui.winfo_screenheight()
+        x = (ws/2) - (window_width/2)
+        y = (hs/2) - (window_height/2)
+        self.gui.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
+
         self.log("Initializing installer.")
         self.log("Welcome to Plone Installer for Windows.")
 
-        if self.install_status == "wsl_enabled":
-            self.log("Picking up where we left off. Installing Linux Subsystem...")
-            self.run_PS("installWSL.ps1") #Install Ubuntu on Windows
-            self.wait_for_status_change(5000) # Not sure how long this takes
-
-            if self.install_status == "wsl_installed":
-                self.install_on_wsl()
-
-            else:
-                self.catch()
-
-        elif self.install_status == "begin":
+        if self.install_status == "begin":
             self.run_PS("getWinInfo.ps1")
             self.wait_for_status_change(10)
 
@@ -85,43 +89,48 @@ class WindowsPloneInstaller:
                 else:
                     self.install_type = IntVar(value=0)
                     self.log("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
+        
+        elif self.install_status == "enabling_wsl":
+            self.log("Picking up where we left off. Installing Linux Subsystem...")
+            self.install_type = IntVar(value=1)
+            self.init_install()
 
-        #else:
-            # This shouldn't really happen.
-            # Is another instance of the installer already running? Should we start installion over?
+        else:
+            self.catch()
 
-        self.okaybutton = Button(self.fr1, text="Okay")
-        self.okaybutton.grid(row=2, sticky="WE")
-        self.okaybutton.bind("<Button>", self.init_install)
-
-        cancelbutton = Button(self.fr1, text="Cancel")
-        cancelbutton.grid(row=3, sticky="WE")
-        cancelbutton.bind("<Button>", self.killapp)
-        self.fin = ''
-
-        ws = self.gui.winfo_screenwidth()
-        hs = self.gui.winfo_screenheight()
-        x = (ws/2) - (window_width/2)
-        y = (hs/2) - (window_height/2)
-        self.gui.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
 
         self.gui.mainloop()
         
-    def init_install(self, event):
+    def okay_handler(self, event): #handle the event and allow init_install to be called without an event
+        self.init_install()
+
+    def init_install(self):
 
         self.okaybutton.configure(state="disabled")
 
         if self.install_type.get(): #if this is true, this machine has proper version for WSL route
-            self.log('Checking for Linux Subsystem')
-            SetValueEx(HKEY_CURRENT_USER, self.run_once_key, 0, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the next restart
+            self.log('Checking for Linux Subsystem (WSL)')
             self.run_PS("enableWSL.ps1") #Make sure WSL is enabled and check if it is already installed
-            self.wait_for_status_change(15)
+            self.wait_for_status_change(45)
 
-            if self.install_status == "wsl_enabled":
-                self.log('Linux Subsystem enabled. Must restart to install it!')
+            if self.install_status == "enabling_wsl":
+                SetValue(HKEY_CURRENT_USER, self.run_once_key, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the next restart
+                self.log('Enabling Linux Subsystem, Please allow PowerShell to restart for you.')
+            elif self.install_status == "wsl_enabled":
+                self.log('Linux Subsystem enabled.')
+                self.log('Installing the Linux Subsystem.')
+                self.run_PS("installWSL.ps1")
+                self.wait_for_status_change(2000)
+
+                if self.install_status == "wsl_installed":
+                    self.log('Installed the linux subsystem, now installing Plone.')
+                    self.install_on_wsl()
+                
+                else:
+                    catch()
 
             elif self.install_status == "wsl_installed":
-                self.log('Linux Subsystem already installed, installing Plone')
+                self.log('Linux Subsystem previously installed, installing Plone')
                 self.install_on_wsl()
 
             else:
@@ -163,7 +172,7 @@ class WindowsPloneInstaller:
 
     def install_on_wsl(self):
         self.run_PS("installPlone.ps1") #Install Plone on the new instance of WSL
-        self.wait_for_status_change(150) # Not sure how long this takes
+        self.wait_for_status_change(5000) # Not sure how long this takes
 
         if self.install_status == "complete":
             log("Plone installed successfully on Linux subsystem!")
@@ -193,7 +202,7 @@ class WindowsPloneInstaller:
 
     def catch(self):
         if self.install_status == "timed_out":
-                print("Installer process timed out!")
+                log("Installer process timed out!")
 
     def log(self, message):
         with open(self.log_file, "a") as log:
@@ -204,6 +213,7 @@ class WindowsPloneInstaller:
         self.log_text.see(END)
 
     def clean_up(self):
+        self.log('Cleaning up.')
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
         DeleteKey(k, "install_status")
         DeleteKey(k, "base_path")
