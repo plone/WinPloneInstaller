@@ -3,7 +3,7 @@
 WinPloneInstaller.py
 ====================
 
-WinPloneInstaller.py contains the main logic of the installer. :ref:`pyinstaller` is used to convert this file to an executable that includes its dependencies. There are plenty of comments inside the file to help understand what it is doing, but the basic strategy is:
+WinPloneInstaller.py contains the main logic of the installer. `PyInstaller <https://github.com/lucid-0/WinPloneInstaller/wiki/PyInstaller>`_ is used to convert this file to an executable that includes its dependencies. There are plenty of comments inside the file to help understand what it is doing, but the basic strategy is:
 
 * Check if our Windows registry key already exists.
 
@@ -19,7 +19,7 @@ WinPloneInstaller.py contains the main logic of the installer. :ref:`pyinstaller
 
   * If Standard Buildout is chosen
 
-    * Install :ref:`chocolatey` (a software manager for Windows)
+    * Install `Chocolatey <https://github.com/lucid-0/WinPloneInstaller/wiki/chocolatey>`_ (a software manager for Windows)
     * Use to install Python, Git, etc.
     * Run buildout
 

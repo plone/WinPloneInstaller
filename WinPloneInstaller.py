@@ -30,41 +30,58 @@ class WindowsPloneInstaller:
             self.install_status = "begin"
             SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
 
-        SetValueEx(k, "base_path", 1,REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
+        SetValueEx(k, "base_path", 1, REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
         SetValueEx(k, "installer_path", 1, REG_SZ, os.path.dirname(self.installer_path))
         CloseKey(k)
 
         self.last_status = self.install_status
         self.init_GUI()
 
-    def killapp(self, event):
-        sys.exit(0)
-
     def init_GUI(self):
         self.gui = Tk()
         self.gui.title("Windows Plone Installer")
         window_width = 500
-        window_height = 275
+        window_height = 325
         self.fr1 = Frame(self.gui, width=window_width, height=window_height)
         self.fr1.pack(side="top")
 
+        #GUI Row 0
         self.log_text = Text(self.fr1, borderwidth=3, relief="sunken",spacing1=1, height=8, width=50, bg="black", fg="white")
         self.log_text.config(font=("consolas", 12), undo=True, wrap='word')
-        self.log_text.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        self.log_text.grid(row=0, column=0, sticky="nsew", padx=2, pady=2) 
 
         scrollb = Scrollbar(self.fr1, command=self.log_text.yview)
         scrollb.grid(row=0, column=1, sticky='nsew')
         self.log_text['yscrollcommand'] = scrollb.set
 
+        #GUI Row 1
+        self.start_plone = IntVar(value=1)
+        Checkbutton(self.fr1, text="Start Plone after installation", variable=self.start_plone).grid(row=1,sticky="EW")
+
+        #GUI Row 2
+        self.default_password = IntVar(value=1)
+        Checkbutton(self.fr1, text="Use username:admin password:admin for Plone (otherwise be prompted)", variable=self.default_password).grid(row=2,sticky="EW")
+
+         #GUI Row 3
+        self.default_directory = IntVar(value=1)
+        Checkbutton(self.fr1, text="Install to default directory (/etc/Plone, otherwise be prompted)", variable=self.default_directory).grid(row=3, sticky="EW")
+
+         #GUI Row 4
+        self.auto_restart = IntVar(value=1)
+        self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Prompt for reboot (otherwise automatic)", variable=self.auto_restart).grid(row=4,stick="EW")
+
+        #GUI Row 5
         self.okaybutton = Button(self.fr1, text="Okay")
-        self.okaybutton.grid(row=2, sticky="WE")
+        self.okaybutton.grid(row=5, sticky="WE")
         self.okaybutton.bind("<Button>", self.okay_handler)
 
+        #GUI Row 6
         cancelbutton = Button(self.fr1, text="Cancel")
-        cancelbutton.grid(row=3, sticky="WE")
+        cancelbutton.grid(row=6, sticky="WE")
         cancelbutton.bind("<Button>", self.killapp)
         self.fin = ''
 
+        #GUI Settings
         ws = self.gui.winfo_screenwidth()
         hs = self.gui.winfo_screenheight()
         x = (ws/2) - (window_width/2)
@@ -81,23 +98,24 @@ class WindowsPloneInstaller:
             if self.install_status == "got_win_info":
                 k = OpenKey(HKEY_CURRENT_USER, self.plone_key)
                 
-                env_build = int(str(QueryValueEx(k, "win_version")).split('.')[2].split("'")[0]) #this feels 'rigged.' Moved it to PowerShell because it's much more reliable, however.
+                env_build = int(str(QueryValueEx(k, "win_version")).split('.')[2].split("'")[0]) #this feels 'rigged.' PowerShell seemed a reliable route to get this, however.
 
                 if env_build >= self.required_build:
-                    self.install_type = IntVar(value=1)
-                    Checkbutton(self.fr1, text="Install using Ubuntu for Windows (recommended)", variable=self.install_type).grid(row=1,sticky="NW")
+                    self.install_on_WSL = IntVar(value=1)
+                    Checkbutton(self.fr1, text="Install using Ubuntu for Windows (recommended)", variable=self.install_on_WSL).grid(row=1,sticky="NW")
                 else:
-                    self.install_type = IntVar(value=0)
+                    self.install_on_WSL = IntVar(value=0)
+                    self.auto_restart_checkbutton.grid_forget()
                     self.log("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
         
         elif self.install_status == "enabling_wsl":
             self.log("Picking up where we left off. Installing Linux Subsystem...")
-            self.install_type = IntVar(value=1)
+            self.install_on_WSL = IntVar(value=1)
+            self.get_reg_vars() #grab user's installation config values from registry
             self.init_install()
 
         else:
             self.catch()
-
 
         self.gui.mainloop()
         
@@ -108,8 +126,9 @@ class WindowsPloneInstaller:
 
         self.okaybutton.configure(state="disabled")
 
-        if self.install_type.get(): #if this is true, this machine has proper version for WSL route
+        if self.install_on_WSL.get(): #if this is true, this machine has proper Windows updates for WSL route
             self.log('Checking for Linux Subsystem (WSL)')
+            self.set_reg_vars() #put user's installation config variables in registry in case we have to restart.
             self.run_PS("enableWSL.ps1") #Make sure WSL is enabled and check if it is already installed
             self.wait_for_status_change(45)
 
@@ -124,53 +143,23 @@ class WindowsPloneInstaller:
 
                 if self.install_status == "wsl_installed":
                     self.log('Installed the linux subsystem, now installing Plone.')
-                    self.install_on_wsl()
+                    self.wsl_install()
                 
                 else:
                     catch()
 
             elif self.install_status == "wsl_installed":
                 self.log('Linux Subsystem previously installed, installing Plone')
-                self.install_on_wsl()
+                self.wsl_install()
 
             else:
                 catch()
 
         else: #either this machine isn't high enough version,or user has selected standard buildout route manually.
-            self.log('Installing Chocolatey package manager')
-            self.run_PS("installChoco.ps1") #Chocolatey will allow us to grab dependencies.
-            self.wait_for_status_change(90)
+            self.buildout_install
 
-            if self.install_status == "choco_installed":
-                self.log('Chocolatey Installed')
-                self.log('Installing Plone Dependencies using Chocolatey')
-                self.run_PS("installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
-
-                self.wait_for_status_change(300)
-
-                if self.install_status == "dependencies_installed":
-                    self.log("Dependencies installed.")
-                    self.log("Preparing virtualenv and gathering Plone buildout from GitHub.")
-                    self.wait_for_status_change(500)
-
-                    if self.install_status == "starting_buildout":
-                        self.log("Running buildout, this may take a while...")
-
-                        self.wait_for_status_change(5000) #Not sure how long this takes
-
-                        if self.install_status == "complete":
-                            log("Plone installed successfully!")
-                            self.clean_up()
-                        else:
-                            self.catch()
-                    else:
-                        self.catch()
-                else:
-                    self.catch()
-            else:
-                self.catch()
-
-    def install_on_wsl(self):
+    def wsl_install(self):
+        self.update_scripts()
         self.run_PS("installPlone.ps1") #Install Plone on the new instance of WSL
         self.wait_for_status_change(5000) # Not sure how long this takes
 
@@ -179,6 +168,83 @@ class WindowsPloneInstaller:
             self.clean_up()
         else:
             catch()
+
+    def buildout_install(self):
+        self.log('Installing Chocolatey package manager')
+        self.run_PS("installChoco.ps1") #Chocolatey will allow us to grab dependencies.
+        self.wait_for_status_change(90)
+
+        if self.install_status == "choco_installed":
+            self.log('Chocolatey Installed')
+            self.log('Installing Plone Dependencies using Chocolatey')
+            self.run_PS("installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
+
+            self.wait_for_status_change(300)
+
+            if self.install_status == "dependencies_installed":
+                self.log("Dependencies installed.")
+                self.log("Preparing virtualenv and gathering Plone buildout from GitHub.")
+                self.wait_for_status_change(500)
+
+                if self.install_status == "starting_buildout":
+                    self.log("Running buildout, this may take a while...")
+
+                    self.wait_for_status_change(5000) #Not sure how long this takes
+
+                    if self.install_status == "complete":
+                        log("Plone installed successfully!")
+                        self.clean_up()
+                    else:
+                        self.catch()
+                else:
+                    self.catch()
+            else:
+                self.catch()
+        else:
+            self.catch()
+
+    def update_scripts(self):
+        if self.install_on_WSL.get():
+            install_call = "sudo ./install.sh"
+
+            if self.default_password.get():
+                install_call += " --password=admin"
+
+            if self.default_directory.get():
+                install_call += " --/etc/Plone"
+
+            install_call += " standalone"
+
+            with open(self.base_path + "\bash\plone.sh", "a") as bash_script:
+                bash_script.write(install_call+"\n")
+
+                if self.start_plone.get():
+                    bash_script.write("/etc/Plone/zinstance/bin/plonectl start") #this line will start plone in WSL
+
+                bash_script.close()
+
+            with open(self.base_path + "\PS\enableWSL.ps1", "a") as enable_script:
+                if self.auto_restart.get() == False:
+                    enable_script.write('Write-Host -NoNewLine "WinPloneInstaller needs to restart! It will continue when you return, press any key when ready..."\n')
+                    enable_script.write('$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")')
+                
+                enable_script.write("Restart-Computer }") #fix this hack-it bracket
+
+                enable_script.close()
+
+    def set_reg_vars(self):
+        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+        SetValueEx(k, "start_plone", 1, REG_SZ, self.start_plone)
+        SetValueEx(k, "default_directory", 1, REG_SZ, self.default_directory)
+        SetValueEx(k, "default_password", 1, REG_SZ, self.default_password)
+        SetValueEx(k, "auto_restart", 1, REG_SZ, self.auto_restart)
+
+    def get_reg_vars(self):
+        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+        self.start_plone = QueryValueEx(k, "start_plone")
+        self.default_directory = QueryValueEx(k, "default_directory")
+        self.default_password = QueryValueEx(k, "default_password")
+        self.auto_restart = QueryValueEx(k, "auto_restart")
 
     def run_PS(self, script_name):
         script_path = self.base_path+"\\PS\\"+script_name
@@ -221,6 +287,9 @@ class WindowsPloneInstaller:
         DeleteKey(k, "win_version")
         CloseKey(k)
         DeleteKey(HKEY_CURRENT_USER, self.plone_key)
+
+    def killapp(self, event):
+        sys.exit(0)
 
 if __name__ == "__main__":
     try:

@@ -33,6 +33,7 @@ if ($myWindowsPrincipal.IsInRole($adminRole)) {
    exit
 }
 
+#Below will be elevated
 reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
 if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux).State -eq "Enabled") {
 	if (Get-Command bash -ErrorAction SilentlyContinue) { # WSL is already installed...will not override current setup, WinPloneInstaller will call installWSL.ps1
@@ -44,7 +45,3 @@ if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem
 	Set-ItemProperty HKCU:\Software\PloneInstaller install_status "enabling_wsl"
     
 	Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux
-	Write-Host -NoNewLine "WinPloneInstaller needs to restart! It will continue when you return, press any key when ready..."
-	$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-	Restart-Computer
-}
