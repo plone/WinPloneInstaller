@@ -230,7 +230,13 @@ class WindowsPloneInstaller:
                 enable_script.write("Restart-Computer }") #fix this hack-it bracket
 
                 enable_script.close()
+        else:
+            if self.start_plone.get():
+                with open(self.base_path + "\\PS\\install_plone_buildout.ps1", "a") as buildout_script:
+                        buildout_script.write('bin\instance start')
 
+                        buildout_script.close()
+                        
     def set_reg_vars(self):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
         messagebox.showinfo(title=self.start_plone.get())
