@@ -155,7 +155,8 @@ class WindowsPloneInstaller:
                 catch()
 
         else: #either this machine isn't high enough version,or user has selected standard buildout route manually.
-            self.buildout_install
+            self.update_scripts()
+            self.buildout_install()
 
     def wsl_install(self):
         self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
@@ -247,7 +248,7 @@ class WindowsPloneInstaller:
     def run_PS(self, script_name):
         script_path = self.base_path+"\\PS\\"+script_name
         self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
-        sp.run(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path, "-ExecutionPolicy", "Unrestricted", "-windowstyle", "hidden"])
+        sp.run(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path])
 
     def wait_for_status_change(self, timeout):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
