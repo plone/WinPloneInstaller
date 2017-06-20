@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['WinPloneInstaller.py'],
-             pathex=['C:\\Users\\Plone\\Documents\\GitHub\\WinPloneInstaller'],
+             pathex=['C:\\Users\\!lucid\\Documents\\GitHub\\WinPloneInstaller'],
              binaries=[],
              datas=[('./PS/*', './PS'), ('./bash/*', './bash')],
              hiddenimports=[],

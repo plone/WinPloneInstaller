@@ -214,15 +214,15 @@ class WindowsPloneInstaller:
 
             install_call += " standalone"
 
-            with open(self.base_path + "\bash\plone.sh", "a") as bash_script:
-                bash_script.write(install_call+"\n")
+            with open(self.base_path + "\\bash\\plone.sh", "a") as bash_script:
+                bash_script.write("\n"+install_call+"\n")
 
                 if self.start_plone.get():
                     bash_script.write("/etc/Plone/zinstance/bin/plonectl start") #this line will start plone in WSL
 
                 bash_script.close()
 
-            with open(self.base_path + "\PS\enableWSL.ps1", "a") as enable_script:
+            with open(self.base_path + "\\PS\\enable_wsl.ps1", "a") as enable_script:
                 if self.auto_restart.get() == False:
                     enable_script.write('Write-Host -NoNewLine "WinPloneInstaller needs to restart! It will continue when you return, press any key when ready..."\n')
                     enable_script.write('$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")')
@@ -233,17 +233,18 @@ class WindowsPloneInstaller:
 
     def set_reg_vars(self):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        SetValueEx(k, "start_plone", 1, REG_SZ, self.start_plone)
-        SetValueEx(k, "default_directory", 1, REG_SZ, self.default_directory)
-        SetValueEx(k, "default_password", 1, REG_SZ, self.default_password)
-        SetValueEx(k, "auto_restart", 1, REG_SZ, self.auto_restart)
+        messagebox.showinfo(title=self.start_plone.get())
+        SetValueEx(k, "start_plone", 1, REG_SZ, str(self.start_plone.get()))
+        SetValueEx(k, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
+        SetValueEx(k, "default_password", 1, REG_SZ, str(self.default_password.get()))
+        SetValueEx(k, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
 
     def get_reg_vars(self):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        self.start_plone = QueryValueEx(k, "start_plone")
-        self.default_directory = QueryValueEx(k, "default_directory")
-        self.default_password = QueryValueEx(k, "default_password")
-        self.auto_restart = QueryValueEx(k, "auto_restart")
+        self.start_plone.set(int(QueryValueEx(k, "start_plone")))
+        self.default_directory.set(int(QueryValueEx(k, "default_directory")))
+        self.default_password.set(int(QueryValueEx(k, "default_password")))
+        self.auto_restart.set(int(QueryValueEx(k, "auto_restart")))
 
     def run_PS(self, script_name):
         script_path = self.base_path+"\\PS\\"+script_name
