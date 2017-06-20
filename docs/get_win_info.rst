@@ -1,4 +1,4 @@
-getWinInfo.ps1
+get_win_info.ps1
 ==============
 
 In testing earlier versions of the installer, it was discovered that PowerShell is more reliable than Python at determining which Windows build number the script is being executed on (which comes as no surprise).

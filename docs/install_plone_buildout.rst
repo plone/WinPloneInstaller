@@ -1,7 +1,7 @@
-installPloneBuildout.ps1
+install_plone_buildout.ps1
 ========================
 
-This is the second and final PowerShell script called when installing on a machine that cannot run `WSL <https://github.com/lucid-0/WinPloneInstaller/wiki/WSL>`_, or the user opted out of WSL (preceded by `installChoco.ps1 <https://github.com/lucid-0/WinPloneInstaller/wiki/installChoco.ps1>`_).
+This is the second and final PowerShell script called when installing on a machine that cannot run `WSL <https://github.com/lucid-0/WinPloneInstaller/wiki/WSL>`_, or the user opted out of WSL (preceded by `install_choco.ps1 <https://github.com/lucid-0/WinPloneInstaller/wiki/install_choco.ps1>`_).
 
 This script configures the newly installed `Chocolatey <https://github.com/lucid-0/WinPloneInstaller/wiki/Chocolatey>`_ and uses it to download Python, Git, and the VC++ tools for Python (Plone/Buildout dependencies).
 

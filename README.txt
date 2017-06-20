@@ -6,6 +6,7 @@ Steps for creating installer EXE with PyInstaller
 	Make sure pip is installed and accessible from powershell
 	Run "pip install pyinstaller"
 	Be sure python-tk package is installed for GUI (hit and miss for me whether I had to do this manually)
+	http://pywin32.sourceforge.net/ may need to be added manually (especially when building on older versions of Windows)
 	Run build.ps1 in powershell
 
 To test the project on Win10 you might want to be able to uninstall

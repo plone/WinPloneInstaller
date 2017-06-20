@@ -1,8 +1,10 @@
 import subprocess as sp
 import os
+import platform
 import time
 from winreg import *
 from tkinter import *
+from tkinter import messagebox
 from tkinter.ttk import *
 
 class WindowsPloneInstaller:
@@ -68,7 +70,8 @@ class WindowsPloneInstaller:
 
          #GUI Row 4
         self.auto_restart = IntVar(value=1)
-        self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Prompt for reboot (otherwise automatic)", variable=self.auto_restart).grid(row=4,stick="EW")
+        self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Prompt for reboot (otherwise automatic)", variable=self.auto_restart)
+        self.auto_restart_checkbutton.grid(row=4,stick="EW")
 
         #GUI Row 5
         self.okaybutton = Button(self.fr1, text="Okay")
@@ -92,22 +95,17 @@ class WindowsPloneInstaller:
         self.log("Welcome to Plone Installer for Windows.")
 
         if self.install_status == "begin":
-            self.run_PS("getWinInfo.ps1")
-            self.wait_for_status_change(10)
+            
+            env_build = int(platform.version().split(".")[2])
 
-            if self.install_status == "got_win_info":
-                k = OpenKey(HKEY_CURRENT_USER, self.plone_key)
-                
-                env_build = int(str(QueryValueEx(k, "win_version")).split('.')[2].split("'")[0]) #this feels 'rigged.' PowerShell seemed a reliable route to get this, however.
-
-                if env_build >= self.required_build:
-                    self.install_on_WSL = IntVar(value=1)
-                    Checkbutton(self.fr1, text="Install using Ubuntu for Windows (recommended)", variable=self.install_on_WSL).grid(row=1,sticky="NW")
-                else:
-                    self.install_on_WSL = IntVar(value=0)
-                    self.auto_restart_checkbutton.grid_forget()
-                    self.log("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
-        
+            if env_build >= self.required_build:
+                self.install_on_WSL = IntVar(value=1)   
+                Checkbutton(self.fr1, text="Install using Ubuntu for Windows (recommended)", variable=self.install_on_WSL).grid(row=1,sticky="NW")
+            else:
+                self.install_on_WSL = IntVar(value=0)
+                self.auto_restart_checkbutton.grid_forget()
+                self.log("You do not have a new enough version of Windows to install with Ubuntu for Windows.\n Please install Creator's Update or newer to use Ubuntu.\nOr press OK to install using standard buildout.")
+            
         elif self.install_status == "enabling_wsl":
             self.log("Picking up where we left off. Installing Linux Subsystem...")
             self.install_on_WSL = IntVar(value=1)
@@ -127,9 +125,10 @@ class WindowsPloneInstaller:
         self.okaybutton.configure(state="disabled")
 
         if self.install_on_WSL.get(): #if this is true, this machine has proper Windows updates for WSL route
+            self.update_scripts()
             self.log('Checking for Linux Subsystem (WSL)')
             self.set_reg_vars() #put user's installation config variables in registry in case we have to restart.
-            self.run_PS("enableWSL.ps1") #Make sure WSL is enabled and check if it is already installed
+            self.run_PS("enable_wsl.ps1") #Make sure WSL is enabled and check if it is already installed
             self.wait_for_status_change(45)
 
             if self.install_status == "enabling_wsl":
@@ -138,7 +137,7 @@ class WindowsPloneInstaller:
             elif self.install_status == "wsl_enabled":
                 self.log('Linux Subsystem enabled.')
                 self.log('Installing the Linux Subsystem.')
-                self.run_PS("installWSL.ps1")
+                self.run_PS("install_wsl.ps1")
                 self.wait_for_status_change(2000)
 
                 if self.install_status == "wsl_installed":
@@ -159,8 +158,7 @@ class WindowsPloneInstaller:
             self.buildout_install
 
     def wsl_install(self):
-        self.update_scripts()
-        self.run_PS("installPlone.ps1") #Install Plone on the new instance of WSL
+        self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
         self.wait_for_status_change(5000) # Not sure how long this takes
 
         if self.install_status == "complete":
@@ -171,13 +169,13 @@ class WindowsPloneInstaller:
 
     def buildout_install(self):
         self.log('Installing Chocolatey package manager')
-        self.run_PS("installChoco.ps1") #Chocolatey will allow us to grab dependencies.
+        self.run_PS("install_choco.ps1") #Chocolatey will allow us to grab dependencies.
         self.wait_for_status_change(90)
 
         if self.install_status == "choco_installed":
             self.log('Chocolatey Installed')
             self.log('Installing Plone Dependencies using Chocolatey')
-            self.run_PS("installPloneBuildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
+            self.run_PS("install_plone_buildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
 
             self.wait_for_status_change(300)
 
@@ -249,10 +247,9 @@ class WindowsPloneInstaller:
     def run_PS(self, script_name):
         script_path = self.base_path+"\\PS\\"+script_name
         self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
-        #sp.call(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path, "-ExecutionPolicy", "Unrestricted", "-windowstyle", "hidden;"]) #these -options aren't actually working.
         sp.run(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path, "-ExecutionPolicy", "Unrestricted", "-windowstyle", "hidden"])
 
-    def wait_for_status_change(self, timeout): #add a timeout here in case, for example, powershell crashes before updating status
+    def wait_for_status_change(self, timeout):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
         count = 0
         while self.install_status == self.last_status:
