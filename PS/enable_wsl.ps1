@@ -33,14 +33,17 @@ if ($myWindowsPrincipal.IsInRole($adminRole)) {
 }
 
 #Below will be elevated
-reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
-if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux).State -eq "Enabled") {
-	if (Get-Command bash -ErrorAction SilentlyContinue) { # WSL is already installed...will not override current setup, WinPloneInstaller will call install_wsl.ps1
-		Set-ItemProperty HKCU:\Software\PloneInstaller install_status "wsl_installed"
-	} else { #WinPloneInstaller.py will call install_wsl.ps1
-		Set-ItemProperty HKCU:\Software\PloneInstaller install_status "wsl_enabled"
-	}
-} else { #WinPloneInstaller.py will complete this code block
-	Set-ItemProperty HKCU:\Software\PloneInstaller install_status "enabling_wsl"
-    
-	Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux
+if ((Get-WmiObject win32_operatingsystem).buildNumber -lt 15063) {
+    Set-ItemProperty HKCU:\Software\PloneInstaller install_status "install_with_buildout" #This is not high enough Windows build.
+} else {
+    reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
+    if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux).State -eq "Enabled") {
+        if (Get-Command bash -ErrorAction SilentlyContinue) { # WSL is already installed...will not override current setup, WinPloneInstaller will call install_wsl.ps1
+            Set-ItemProperty HKCU:\Software\PloneInstaller install_status "wsl_installed"
+        } else { #WinPloneInstaller.py will call install_wsl.ps1
+            Set-ItemProperty HKCU:\Software\PloneInstaller install_status "wsl_enabled"
+        }
+    } else { #WinPloneInstaller.py will complete this code block
+        Set-ItemProperty HKCU:\Software\PloneInstaller install_status "enabling_wsl"
+        
+        Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux
