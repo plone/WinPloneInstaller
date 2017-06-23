@@ -21,8 +21,6 @@ class WindowsPloneInstaller:
         self.installer_path = os.path.realpath(__file__).split(".")[0]+".exe"
         self.log_file = os.path.dirname(self.installer_path) + "\install.log"
 
-        self.required_build = 15063
-
         try: #Grab installation state from registry if it exists
             k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
             self.install_status = QueryValueEx(k, "install_status")[0]
@@ -115,36 +113,9 @@ class WindowsPloneInstaller:
 
         self.update_scripts()
         self.log('Checking for Linux Subsystem (WSL)')
-        self.set_reg_vars() #put user's installation config variables in registry in case we have to restart.
         self.run_PS("enable_wsl.ps1") #Make sure WSL is enabled and check if it is already installed
         #messagebox.showinfo(title='after call to run_ps')
-        self.wait_for_status_change(45)
 
-        if self.install_status == "install_with_buildout":
-            self.log("Simple buildout installation will be used. Windows 10 with Creator's Update is required for WSL installation (recommended)")
-            self.buildout_install()
-        elif self.install_status == "enabling_wsl":
-            SetValue(HKEY_CURRENT_USER, self.run_once_key, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the next restart
-            self.log('Enabling Linux Subsystem, Please allow PowerShell to restart for you.')
-        elif self.install_status == "wsl_enabled":
-            self.log('Linux Subsystem enabled.')
-            self.log('Installing the Linux Subsystem.')
-            self.run_PS("install_wsl.ps1")
-            self.wait_for_status_change(2000)
-
-            if self.install_status == "wsl_installed":
-                self.log('Installed the linux subsystem, now installing Plone.')
-                self.wsl_install()
-            
-            else:
-                catch()
-
-        elif self.install_status == "wsl_installed":
-            self.log('Linux Subsystem previously installed, installing Plone')
-            self.wsl_install()
-
-        else:
-            catch()
 
     def wsl_install(self):
         self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
@@ -232,6 +203,7 @@ class WindowsPloneInstaller:
         SetValueEx(k, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
         SetValueEx(k, "default_password", 1, REG_SZ, str(self.default_password.get()))
         SetValueEx(k, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
+        SetValue(HKEY_CURRENT_USER, self.run_once_key, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the restart
 
     def get_reg_vars(self):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
@@ -243,8 +215,46 @@ class WindowsPloneInstaller:
     def run_PS(self, script_name):
         script_path = self.base_path+"\\PS\\"+script_name
         self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
-        ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path], shell=True, stdin=None, stdout=None, stderr=None, close_fds=True)
-        #sp.run(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path])
+        ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
+        #ps_output = ps_process.communicate()
+        #ps_std_out = ps_output[0]
+        status = "normal"
+        while True:
+            line = ps_process.stdout.readline().decode("utf-8")
+            if line != '':
+                if line[:2] == "**": #this is a log flag echoed out from the powershell process.
+                    self.log(line[2:])
+                elif line[:2] == "*!": #this is an important step/command flag to the installer from the powershell process.
+                    status = line[2:]
+                    self.log(status)
+                    break #we need to get out of this loop before we proceed with the message for control flow
+            else:
+                break #No more lines to read from the PowerShell process.
+
+        if status == "normal":
+            return
+        else:
+            self.PS_handler(status)
+
+    def PS_handler(self, status):
+        if status == "Installing WSL":
+            self.log('Linux Subsystem enabled.')
+            self.log('Installing the Linux Subsystem.')
+            self.run_PS("install_wsl.ps1")
+            self.wait_for_status_change(2000)
+
+            if self.install_status == "wsl_installed":
+                self.log('Installed the linux subsystem, now installing Plone.')
+                self.wsl_install()
+            
+            else:
+                catch()
+        elif status == "Installing Plone with buildout":
+            self.buildout_install()
+        elif status == "Installing Plone on WSl":
+            self.wsl_install()
+        elif status == "restart the machine":
+            self.set_reg_vars() #put user's installation config variables in registry for post-restart recovery
 
     def wait_for_status_change(self, timeout):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
