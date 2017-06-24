@@ -31,10 +31,11 @@ class WindowsPloneInstaller:
             SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
 
         SetValueEx(k, "base_path", 1, REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
-        SetValueEx(k, "installer_path", 1, REG_SZ, os.path.dirname(self.installer_path))
+        SetValueEx(k, "installer_path", 1, REG_SZ, self.installer_path)
         CloseKey(k)
 
         self.last_status = self.install_status
+
         self.init_GUI()
 
     def init_GUI(self):
@@ -79,7 +80,7 @@ class WindowsPloneInstaller:
         #GUI Row 6
         cancelbutton = Button(self.fr1, text="Cancel")
         cancelbutton.grid(row=6, sticky="WE")
-        cancelbutton.bind("<Button>", self.killapp)
+        cancelbutton.bind("<Button>", self.cancel_handler)
         self.fin = ''
 
         #GUI Settings
@@ -88,6 +89,8 @@ class WindowsPloneInstaller:
         x = (ws/2) - (window_width/2)
         y = (hs/2) - (window_height/2)
         self.gui.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
+
+        self.run_PS("elevate.ps1")
 
         self.log("Welcome to Plone Installer for Windows.")
 
@@ -104,8 +107,11 @@ class WindowsPloneInstaller:
 
         self.gui.mainloop()
         
-    def okay_handler(self, event): #handle the event and allow init_install to be called without an event
+    def okay_handler(self, event):
         self.init_install()
+
+    def cancel_handler(self, event):
+        self.kill_app()
 
     def init_install(self):
 
@@ -126,40 +132,6 @@ class WindowsPloneInstaller:
             self.clean_up()
         else:
             catch()
-
-    def buildout_install(self):
-        self.log('Installing Chocolatey package manager')
-        self.run_PS("install_choco.ps1") #Chocolatey will allow us to grab dependencies.
-        self.wait_for_status_change(90)
-
-        if self.install_status == "choco_installed":
-            self.log('Chocolatey Installed')
-            self.log('Installing Plone Dependencies using Chocolatey')
-            self.run_PS("install_plone_buildout.ps1")  #Run the regular Plone buildout script for users who are not using Ubuntu/Bash
-
-            self.wait_for_status_change(300)
-
-            if self.install_status == "dependencies_installed":
-                self.log("Dependencies installed.")
-                self.log("Preparing virtualenv and gathering Plone buildout from GitHub.")
-                self.wait_for_status_change(500)
-
-                if self.install_status == "starting_buildout":
-                    self.log("Running buildout, this may take a while...")
-
-                    self.wait_for_status_change(5000) #Not sure how long this takes
-
-                    if self.install_status == "complete":
-                        log("Plone installed successfully!")
-                        self.clean_up()
-                    else:
-                        self.catch()
-                else:
-                    self.catch()
-            else:
-                self.catch()
-        else:
-            self.catch()
 
     def update_scripts(self):
 
@@ -224,7 +196,7 @@ class WindowsPloneInstaller:
             if line != '':
                 if line[:2] == "**": #this is a log flag echoed out from the powershell process.
                     self.log(line[2:])
-                elif line[:2] == "*!": #this is an important step/command flag to the installer from the powershell process.
+                elif line[:2] == "*!": #this is an important status/command flag to the installer from the powershell process.
                     status = line[2:]
                     self.log(status)
                     break #we need to get out of this loop before we proceed with the message for control flow
@@ -234,27 +206,26 @@ class WindowsPloneInstaller:
         if status == "normal":
             return
         else:
-            self.PS_handler(status)
+            self.PS_status_handler(status)
 
-    def PS_handler(self, status):
+    def PS_status_handler(self, status):
         if status == "Installing WSL":
-            self.log('Linux Subsystem enabled.')
-            self.log('Installing the Linux Subsystem.')
+            self.log('Linux Subsystem is enabled')
+            self.log('Installing the Linux Subsystem')
             self.run_PS("install_wsl.ps1")
-            self.wait_for_status_change(2000)
-
-            if self.install_status == "wsl_installed":
-                self.log('Installed the linux subsystem, now installing Plone.')
-                self.wsl_install()
-            
-            else:
-                catch()
         elif status == "Installing Plone with buildout":
-            self.buildout_install()
-        elif status == "Installing Plone on WSl":
+            self.run_PS("install_choco.ps1") #This will install chocolatey and send status 'Chocolatey Installed'
+        elif status == "Chocolatey Instaled":
+            self.run_PS("install_plone_buildout.ps1")
+        elif status == "Installing Plone on WSL":
             self.wsl_install()
         elif status == "restart the machine":
             self.set_reg_vars() #put user's installation config variables in registry for post-restart recovery
+        elif status == "elevated":
+            self.log("Running as Administrator; thank you.")
+        elif status == "elevating":
+            self.log("Will reinitiate as Admin; please accept any prompts.")
+            self.kill_app() #PowerShell will reopen as administrator
 
     def wait_for_status_change(self, timeout):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
@@ -293,7 +264,7 @@ class WindowsPloneInstaller:
         CloseKey(k)
         DeleteKey(HKEY_CURRENT_USER, self.plone_key)
 
-    def killapp(self, event):
+    def kill_app(event):
         sys.exit(0)
 
 if __name__ == "__main__":
