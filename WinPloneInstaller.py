@@ -16,7 +16,7 @@ class WindowsPloneInstaller:
             self.base_path = os.path.abspath(".")
 
         self.plone_key = r'SOFTWARE\PloneInstaller' #our Windows registry key under HKEY_CURRENT_USER
-        self.run_once_key = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
+        #self.run_once_key = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
 
         self.installer_path = os.path.realpath(__file__).split(".")[0]+".exe"
         self.log_file = os.path.dirname(self.installer_path) + "\install.log"
@@ -24,6 +24,7 @@ class WindowsPloneInstaller:
         try: #Grab installation state from registry if it exists
             k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
             self.install_status = QueryValueEx(k, "install_status")[0]
+            self.get_reg_vars()
 
         except: #Otherwise create it with ititial "begin" value
             k = CreateKey(HKEY_CURRENT_USER, self.plone_key)
@@ -90,13 +91,12 @@ class WindowsPloneInstaller:
         y = (hs/2) - (window_height/2)
         self.gui.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
 
-        self.run_PS("elevate.ps1")
-
         self.log("Welcome to Plone Installer for Windows.")
 
         if self.install_status == "begin":
-                self.log("Press 'Okay' to launch PowerShell, gather information about your system and prepare to install Plone.")
-            
+            self.log("Press 'Okay' to launch PowerShell and make sure we are running as Administrator")
+        elif self.install_status == "elevated":
+            self.log("Running as Administrator; thank you")
         elif self.install_status == "enabling_wsl":
             self.log("Picking up where we left off. Installing Linux Subsystem...")
             self.get_reg_vars() #grab user's installation config values from registry
@@ -108,7 +108,11 @@ class WindowsPloneInstaller:
         self.gui.mainloop()
         
     def okay_handler(self, event):
-        self.init_install()
+        self.set_reg_vars()
+        if self.install_status == "begin":
+            self.run_PS("elevate.ps1")
+        elif self.install_status == "elevated":
+            self.init_install()
 
     def cancel_handler(self, event):
         self.kill_app()
@@ -120,18 +124,6 @@ class WindowsPloneInstaller:
         self.update_scripts()
         self.log('Checking for Linux Subsystem (WSL)')
         self.run_PS("enable_wsl.ps1") #Make sure WSL is enabled and check if it is already installed
-        #messagebox.showinfo(title='after call to run_ps')
-
-
-    def wsl_install(self):
-        self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
-        self.wait_for_status_change(5000) # Not sure how long this takes
-
-        if self.install_status == "complete":
-            log("Plone installed successfully on Linux subsystem!")
-            self.clean_up()
-        else:
-            catch()
 
     def update_scripts(self):
 
@@ -175,7 +167,7 @@ class WindowsPloneInstaller:
         SetValueEx(k, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
         SetValueEx(k, "default_password", 1, REG_SZ, str(self.default_password.get()))
         SetValueEx(k, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
-        SetValue(HKEY_CURRENT_USER, self.run_once_key, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the restart
+        #SetValue(HKEY_CURRENT_USER, self.run_once_key, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the restart
 
     def get_reg_vars(self):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
@@ -188,12 +180,11 @@ class WindowsPloneInstaller:
         script_path = self.base_path+"\\PS\\"+script_name
         self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
         ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
-        #ps_output = ps_process.communicate()
-        #ps_std_out = ps_output[0]
         status = "normal"
         while True:
-            line = ps_process.stdout.readline().decode("utf-8")
+            line = ps_process.stdout.readline().decode("utf-8").rstrip()
             if line != '':
+                self.log(line)
                 if line[:2] == "**": #this is a log flag echoed out from the powershell process.
                     self.log(line[2:])
                 elif line[:2] == "*!": #this is an important status/command flag to the installer from the powershell process.
@@ -218,14 +209,27 @@ class WindowsPloneInstaller:
         elif status == "Chocolatey Instaled":
             self.run_PS("install_plone_buildout.ps1")
         elif status == "Installing Plone on WSL":
-            self.wsl_install()
+            self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
         elif status == "restart the machine":
             self.set_reg_vars() #put user's installation config variables in registry for post-restart recovery
-        elif status == "elevated":
-            self.log("Running as Administrator; thank you.")
-        elif status == "elevating":
-            self.log("Will reinitiate as Admin; please accept any prompts.")
+        elif status == "Elevating Process":
+            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+            self.log("Will restart executable as Admin; please accept any prompts.")
+            SetValueEx(k, "install_status", 1, REG_SZ, "elevated")
+            k.close()
             self.kill_app() #PowerShell will reopen as administrator
+        elif status == "Running as Admin":
+            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+            self.install_status = "elevated"
+            SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
+            k.close()
+            self.okaybutton.configure(state="enabled")
+            self.log("Press 'Okay' to launch PowerShell, gather information about your system and prepare to install Plone.")
+        elif status == "Plone Installed Successfully on WSL":
+            self.clean_up()
+        elif status == "Plone Installed Succesffully with Buildout":
+            self.clean_up()
+
 
     def wait_for_status_change(self, timeout):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
@@ -264,7 +268,7 @@ class WindowsPloneInstaller:
         CloseKey(k)
         DeleteKey(HKEY_CURRENT_USER, self.plone_key)
 
-    def kill_app(event):
+    def kill_app(self):
         sys.exit(0)
 
 if __name__ == "__main__":

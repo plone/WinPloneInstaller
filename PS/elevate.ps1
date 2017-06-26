@@ -5,23 +5,17 @@ $myWindowsID=[System.Security.Principal.WindowsIdentity]::GetCurrent()
 $myWindowsPrincipal=new-object System.Security.Principal.WindowsPrincipal($myWindowsID)
  
 $adminRole=[System.Security.Principal.WindowsBuiltInRole]::Administrator
- 
+
 if ($myWindowsPrincipal.IsInRole($adminRole)) {
-   Set-ItemProperty HKCU:\Software\PloneInstaller install_status "elevated"
+    echo "*!Running as Admin"
 } else {
-    Set-ItemProperty HKCU:\Software\PloneInstaller install_status "elevating"
+    echo "*!Elevating Process"
     
     $ploneKey = 'HKCU:\Software\PloneInstaller'
     $installerPath = (Get-ItemProperty -Path $ploneKey -Name installer_path).installer_path
-    Set-Location $installerPath
     $newProcess = new-object System.Diagnostics.ProcessStartInfo $installerPath;
     
-    # Specify the current script path and name as a parameter
-    #$newProcess.Arguments = $myInvocation.MyCommand.Definition;
+    $newProcess.Verb = "runas"; # Indicate that the process should be elevated
     
-    # Indicate that the process should be elevated
-    $newProcess.Verb = "runas";
-    
-    # Start the new process
-    [System.Diagnostics.Process]::Start($newProcess);
+    [System.Diagnostics.Process]::Start($newProcess); # Start the new process
 }
