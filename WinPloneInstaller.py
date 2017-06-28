@@ -57,30 +57,34 @@ class WindowsPloneInstaller:
         self.log_text['yscrollcommand'] = scrollb.set
 
         #GUI Row 1
-        self.start_plone = IntVar(value=1)
-        Checkbutton(self.fr1, text="Start Plone after installation", variable=self.start_plone).grid(row=1,sticky="EW")
+        self.progress = Progressbar(self.fr1, orient="horizontal", length=200, mode="determinate")
+        self.progress.grid(row=1, sticky="EW")
 
         #GUI Row 2
-        self.default_password = IntVar(value=1)
-        Checkbutton(self.fr1, text="Use username:admin password:admin for Plone (otherwise be prompted)", variable=self.default_password).grid(row=2,sticky="EW")
+        self.start_plone = IntVar(value=1)
+        Checkbutton(self.fr1, text="Start Plone after installation", variable=self.start_plone).grid(row=2,sticky="EW")
 
-         #GUI Row 3
-        self.default_directory = IntVar(value=1)
-        Checkbutton(self.fr1, text="Install to default directory (/etc/Plone, otherwise be prompted)", variable=self.default_directory).grid(row=3, sticky="EW")
+        #GUI Row 3
+        self.default_password = IntVar(value=1)
+        Checkbutton(self.fr1, text="Use username:admin password:admin for Plone (otherwise be prompted)", variable=self.default_password).grid(row=3,sticky="EW")
 
          #GUI Row 4
+        self.default_directory = IntVar(value=1)
+        Checkbutton(self.fr1, text="Install to default directory (/etc/Plone, otherwise be prompted)", variable=self.default_directory).grid(row=4, sticky="EW")
+
+         #GUI Row 5
         self.auto_restart = IntVar(value=1)
         self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Prompt for reboot (otherwise automatic)", variable=self.auto_restart)
-        self.auto_restart_checkbutton.grid(row=4,stick="EW")
-
-        #GUI Row 5
-        self.okaybutton = Button(self.fr1, text="Okay")
-        self.okaybutton.grid(row=5, sticky="WE")
-        self.okaybutton.bind("<Button>", self.okay_handler)
+        self.auto_restart_checkbutton.grid(row=5,stick="EW")
 
         #GUI Row 6
+        self.okaybutton = Button(self.fr1, text="Okay")
+        self.okaybutton.grid(row=6, sticky="WE")
+        self.okaybutton.bind("<Button>", self.okay_handler)
+
+        #GUI Row 7
         cancelbutton = Button(self.fr1, text="Cancel")
-        cancelbutton.grid(row=6, sticky="WE")
+        cancelbutton.grid(row=7, sticky="WE")
         cancelbutton.bind("<Button>", self.cancel_handler)
         self.fin = ''
 
@@ -202,19 +206,20 @@ class WindowsPloneInstaller:
     def PS_status_handler(self, status):
         if status == "Installing WSL":
             self.log('Linux Subsystem is enabled')
-            self.log('Installing the Linux Subsystem')
+            self.progress["value"] = 10
             self.run_PS("install_wsl.ps1")
         elif status == "Installing Plone with buildout":
             self.run_PS("install_choco.ps1") #This will install chocolatey and send status 'Chocolatey Installed'
         elif status == "Chocolatey Instaled":
             self.run_PS("install_plone_buildout.ps1")
         elif status == "Installing Plone on WSL":
+            self.progress["value"] = 30
             self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
         elif status == "restart the machine":
             self.set_reg_vars() #put user's installation config variables in registry for post-restart recovery
         elif status == "Elevating Process":
-            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
             self.log("Will restart executable as Admin; please accept any prompts.")
+            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
             SetValueEx(k, "install_status", 1, REG_SZ, "elevated")
             k.close()
             self.kill_app() #PowerShell will reopen as administrator
@@ -225,9 +230,8 @@ class WindowsPloneInstaller:
             k.close()
             self.okaybutton.configure(state="enabled")
             self.log("Press 'Okay' to launch PowerShell, gather information about your system and prepare to install Plone.")
-        elif status == "Plone Installed Successfully on WSL":
-            self.clean_up()
-        elif status == "Plone Installed Succesffully with Buildout":
+        elif status == "Plone Installed Succesffully":
+            self.progress["value"] = 10
             self.clean_up()
 
 

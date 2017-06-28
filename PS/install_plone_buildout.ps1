@@ -24,4 +24,4 @@ virtualenv -p C:\python27\python.exe env
 env\Scripts\pip install -r requirements.txt
 echo "**Starting buildout, this may take a while..."
 env\Scripts\buildout
-echo "*!Plone Installed Succesffully with Buildout"
+echo "*!Plone Installed Succesffully"
