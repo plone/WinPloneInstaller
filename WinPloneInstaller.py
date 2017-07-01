@@ -24,7 +24,6 @@ class WindowsPloneInstaller:
         try: #Grab installation state from registry if it exists
             k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
             self.install_status = QueryValueEx(k, "install_status")[0]
-            self.get_reg_vars()
 
         except: #Otherwise create it with ititial "begin" value
             k = CreateKey(HKEY_CURRENT_USER, self.plone_key)
@@ -47,6 +46,12 @@ class WindowsPloneInstaller:
         self.fr1 = Frame(self.gui, width=window_width, height=window_height)
         self.fr1.pack(side="top")
 
+        self.start_plone = IntVar(value=1)
+        self.log_all = IntVar(value=0)
+        self.default_password = IntVar(value=1)
+        self.default_directory = IntVar(value=1)
+        self.auto_restart = IntVar(value=1)
+
         #GUI Row 0
         self.log_text = Text(self.fr1, borderwidth=3, relief="sunken",spacing1=1, height=8, width=50, bg="black", fg="white")
         self.log_text.config(font=("consolas", 12), undo=True, wrap='word')
@@ -61,30 +66,28 @@ class WindowsPloneInstaller:
         self.progress.grid(row=1, sticky="EW")
 
         #GUI Row 2
-        self.start_plone = IntVar(value=1)
         Checkbutton(self.fr1, text="Start Plone after installation", variable=self.start_plone).grid(row=2,sticky="EW")
 
         #GUI Row 3
-        self.default_password = IntVar(value=1)
-        Checkbutton(self.fr1, text="Use username:admin password:admin for Plone (otherwise be prompted)", variable=self.default_password).grid(row=3,sticky="EW")
+        Checkbutton(self.fr1, text="Show all PowerShell output", variable=self.log_all).grid(row=3,sticky="EW")
 
-         #GUI Row 4
-        self.default_directory = IntVar(value=1)
-        Checkbutton(self.fr1, text="Install to default directory (/etc/Plone, otherwise be prompted)", variable=self.default_directory).grid(row=4, sticky="EW")
+        #GUI Row 4
+        Checkbutton(self.fr1, text="Use username:admin password:admin for Plone (otherwise be prompted)", variable=self.default_password).grid(row=4,sticky="EW")
 
          #GUI Row 5
-        self.auto_restart = IntVar(value=1)
-        self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Prompt for reboot (otherwise automatic)", variable=self.auto_restart)
-        self.auto_restart_checkbutton.grid(row=5,stick="EW")
+        Checkbutton(self.fr1, text="Install to default directory (/etc/Plone, otherwise be prompted)", variable=self.default_directory).grid(row=5, sticky="EW")
 
-        #GUI Row 6
-        self.okaybutton = Button(self.fr1, text="Okay")
-        self.okaybutton.grid(row=6, sticky="WE")
-        self.okaybutton.bind("<Button>", self.okay_handler)
+         #GUI Row 6
+        self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Prompt for reboot (otherwise automatic)", variable=self.auto_restart)
+        self.auto_restart_checkbutton.grid(row=6,stick="EW")
 
         #GUI Row 7
+        self.okaybutton = Button(self.fr1, text="Okay")
+        self.okaybutton.grid(row=7, column=0,sticky="EW")
+        self.okaybutton.bind("<Button>", self.okay_handler)
+
         cancelbutton = Button(self.fr1, text="Cancel")
-        cancelbutton.grid(row=7, sticky="WE")
+        cancelbutton.grid(row=7, column = 1, sticky="EW")
         cancelbutton.bind("<Button>", self.cancel_handler)
         self.fin = ''
 
@@ -97,14 +100,19 @@ class WindowsPloneInstaller:
 
         self.log("Welcome to Plone Installer for Windows.")
 
+        try:
+            self.get_reg_vars()
+        except:
+            self.log("No previous installation config found.")
+
         if self.install_status == "begin":
             self.log("Press 'Okay' to launch PowerShell and make sure we are running as Administrator")
         elif self.install_status == "elevated":
             self.log("Running as Administrator; thank you")
+            self.init_install()
         elif self.install_status == "enabling_wsl":
             self.log("Picking up where we left off. Installing Linux Subsystem...")
-            self.get_reg_vars() #grab user's installation config values from registry
-            self.init_install()
+            self.run_PS("install_wsl.ps1")
 
         else:
             self.catch()
@@ -114,6 +122,10 @@ class WindowsPloneInstaller:
     def okay_handler(self, event):
         self.set_reg_vars()
         if self.install_status == "begin":
+            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+            self.install_status = "elevated"
+            SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
+            CloseKey(k)
             self.run_PS("elevate.ps1")
         elif self.install_status == "elevated":
             self.init_install()
@@ -126,7 +138,6 @@ class WindowsPloneInstaller:
         self.okaybutton.configure(state="disabled")
 
         self.update_scripts()
-        self.log('Checking for Linux Subsystem (WSL)')
         self.run_PS("enable_wsl.ps1") #Make sure WSL is enabled and check if it is already installed
 
     def update_scripts(self):
@@ -171,27 +182,31 @@ class WindowsPloneInstaller:
         SetValueEx(k, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
         SetValueEx(k, "default_password", 1, REG_SZ, str(self.default_password.get()))
         SetValueEx(k, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
-        #SetValue(HKEY_CURRENT_USER, self.run_once_key, REG_SZ, self.installer_path) #Set Win Registry to load our installer after the restart
+        SetValueEx(k, "log_all", 1, REG_SZ, str(self.log_all.get()))
+        CloseKey(k)
 
     def get_reg_vars(self):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        self.start_plone.set(int(QueryValueEx(k, "start_plone")))
-        self.default_directory.set(int(QueryValueEx(k, "default_directory")))
-        self.default_password.set(int(QueryValueEx(k, "default_password")))
-        self.auto_restart.set(int(QueryValueEx(k, "auto_restart")))
+        self.start_plone.set(int(QueryValueEx(k, "start_plone")[0]))
+        self.default_directory.set(int(QueryValueEx(k, "default_directory")[0]))
+        self.default_password.set(int(QueryValueEx(k, "default_password")[0]))
+        self.auto_restart.set(int(QueryValueEx(k, "auto_restart")[0]))
+        CloseKey(k)
 
     def run_PS(self, script_name):
         script_path = self.base_path+"\\PS\\"+script_name
         self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
-        ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
+        ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
         status = "normal"
         while True:
             line = ps_process.stdout.readline().decode("utf-8").rstrip()
             if line != '':
-                self.log(line)
-                if line[:2] == "**": #this is a log flag echoed out from the powershell process.
-                    self.log(line[2:])
-                elif line[:2] == "*!": #this is an important status/command flag to the installer from the powershell process.
+                if self.log_all.get():
+                    self.log(line)
+                else:
+                    if line[:2] == "**": #this is a log flag echoed out from the powershell process.
+                        self.log(line[2:])
+                if line[:2] == "*!": #this is an important status/command flag to the installer from the powershell process.
                     status = line[2:]
                     self.log(status)
                     break #we need to get out of this loop before we proceed with the message for control flow
@@ -215,39 +230,32 @@ class WindowsPloneInstaller:
         elif status == "Installing Plone on WSL":
             self.progress["value"] = 30
             self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
-        elif status == "restart the machine":
-            self.set_reg_vars() #put user's installation config variables in registry for post-restart recovery
+        #elif status == "restart the machine":
+        #    self.set_reg_vars() #put user's installation config variables in registry for post-restart recovery
         elif status == "Elevating Process":
             self.log("Will restart executable as Admin; please accept any prompts.")
-            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-            SetValueEx(k, "install_status", 1, REG_SZ, "elevated")
-            k.close()
             self.kill_app() #PowerShell will reopen as administrator
         elif status == "Running as Admin":
-            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-            self.install_status = "elevated"
-            SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
-            k.close()
             self.okaybutton.configure(state="enabled")
             self.log("Press 'Okay' to launch PowerShell, gather information about your system and prepare to install Plone.")
         elif status == "Plone Installed Succesffully":
-            self.progress["value"] = 10
+            self.progress["value"] = 100
             self.clean_up()
 
 
-    def wait_for_status_change(self, timeout):
-        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        count = 0
-        while self.install_status == self.last_status:
-            time.sleep(2) #to prevent this from overkill
-            self.install_status = QueryValueEx(k, "install_status")[0]
-            count += 1
-            if count == timeout:
-                self.install_status = "timed_out"
-                break
-        self.last_status = self.install_status
-        CloseKey(k)
-        return
+    #def wait_for_status_change(self, timeout):
+    #    k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+    #    count = 0
+    #    while self.install_status == self.last_status:
+    #        time.sleep(2) #to prevent this from overkill
+    #        self.install_status = QueryValueEx(k, "install_status")[0]
+    #        count += 1
+    #        if count == timeout:
+    #            self.install_status = "timed_out"
+    #            break
+    #    self.last_status = self.install_status
+    #    CloseKey(k)
+    #    return
 
     def catch(self):
         if self.install_status == "timed_out":
