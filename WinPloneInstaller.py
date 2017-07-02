@@ -1,10 +1,10 @@
 import subprocess as sp
 import os
+import io
 import platform
 import time
 from winreg import *
 from tkinter import *
-from tkinter import messagebox
 from tkinter.ttk import *
 
 class WindowsPloneInstaller:
@@ -47,7 +47,7 @@ class WindowsPloneInstaller:
         self.fr1.pack(side="top")
 
         self.start_plone = IntVar(value=1)
-        self.log_all = IntVar(value=0)
+        self.show_all = IntVar(value=0)
         self.default_password = IntVar(value=1)
         self.default_directory = IntVar(value=1)
         self.auto_restart = IntVar(value=1)
@@ -69,7 +69,7 @@ class WindowsPloneInstaller:
         Checkbutton(self.fr1, text="Start Plone after installation", variable=self.start_plone).grid(row=2,sticky="EW")
 
         #GUI Row 3
-        Checkbutton(self.fr1, text="Show all PowerShell output", variable=self.log_all).grid(row=3,sticky="EW")
+        Checkbutton(self.fr1, text="Show all PowerShell output", variable=self.show_all).grid(row=3,sticky="EW")
 
         #GUI Row 4
         Checkbutton(self.fr1, text="Use username:admin password:admin for Plone (otherwise be prompted)", variable=self.default_password).grid(row=4,sticky="EW")
@@ -78,18 +78,22 @@ class WindowsPloneInstaller:
         Checkbutton(self.fr1, text="Install to default directory (/etc/Plone, otherwise be prompted)", variable=self.default_directory).grid(row=5, sticky="EW")
 
          #GUI Row 6
-        self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Prompt for reboot (otherwise automatic)", variable=self.auto_restart)
+        self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Reboot automatically (otherwise be prompted)", variable=self.auto_restart)
         self.auto_restart_checkbutton.grid(row=6,stick="EW")
 
         #GUI Row 7
-        self.okaybutton = Button(self.fr1, text="Okay")
-        self.okaybutton.grid(row=7, column=0,sticky="EW")
+        button_frame = Frame(self.fr1)
+
+        self.okaybutton = Button(button_frame, text="Okay")
+        self.okaybutton.grid(row = 0, column=0, sticky="W")
         self.okaybutton.bind("<Button>", self.okay_handler)
 
-        cancelbutton = Button(self.fr1, text="Cancel")
-        cancelbutton.grid(row=7, column = 1, sticky="EW")
+        cancelbutton = Button(button_frame, text="Cancel")
+        cancelbutton.grid(row = 0, column = 1, sticky="E")
         cancelbutton.bind("<Button>", self.cancel_handler)
         self.fin = ''
+
+        button_frame.grid(row=7)
 
         #GUI Settings
         ws = self.gui.winfo_screenwidth()
@@ -103,7 +107,7 @@ class WindowsPloneInstaller:
         try:
             self.get_reg_vars()
         except:
-            self.log("No previous installation config found.")
+            self.log("No previous installation config found.", display=False)
 
         if self.install_status == "begin":
             self.log("Press 'Okay' to launch PowerShell and make sure we are running as Administrator")
@@ -113,9 +117,6 @@ class WindowsPloneInstaller:
         elif self.install_status == "enabling_wsl":
             self.log("Picking up where we left off. Installing Linux Subsystem...")
             self.run_PS("install_wsl.ps1")
-
-        else:
-            self.catch()
 
         self.gui.mainloop()
         
@@ -141,16 +142,6 @@ class WindowsPloneInstaller:
         self.run_PS("enable_wsl.ps1") #Make sure WSL is enabled and check if it is already installed
 
     def update_scripts(self):
-
-        with open(self.base_path + "\\PS\\enable_wsl.ps1", "a") as enable_script:
-            if self.auto_restart.get() == False:
-                enable_script.write('\nWrite-Host -NoNewLine "WinPloneInstaller needs to restart! It will continue when you return, press any key when ready..."')
-                enable_script.write('\n$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")')
-            
-            enable_script.write("\nRestart-Computer } }") #fix these hack-it brackets
-
-            enable_script.close()
-
         install_call = "sudo ./install.sh"
 
         if self.default_password.get():
@@ -161,13 +152,13 @@ class WindowsPloneInstaller:
 
         install_call += " standalone"
 
-        with open(self.base_path + "\\bash\\plone.sh", "a") as bash_script:
-            bash_script.write(";"+install_call) #I've done this using ; for now because Windows new line characters are written instead of Unix ones.
+        with io.open(self.base_path + "\\bash\\plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
+            bash_script.write("\n"+install_call) #I've done this using ; for now because Windows new line characters are written instead of Unix ones.
 
             if self.start_plone.get():
-                bash_script.write(";sudo /etc/Plone/zinstance/bin/plonectl start") #this line will start plone in WSL
+                bash_script.write("\nsudo /etc/Plone/zinstance/bin/plonectl start") #this line will start plone in WSL
 
-            #bash_script.write(";rm -rf ") #this will delete the universal installer archive and directory
+            #bash_script.write("\nrm -rf ") #this will delete the universal installer archive and directory
             bash_script.close()
             
         if self.start_plone.get():
@@ -182,7 +173,7 @@ class WindowsPloneInstaller:
         SetValueEx(k, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
         SetValueEx(k, "default_password", 1, REG_SZ, str(self.default_password.get()))
         SetValueEx(k, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
-        SetValueEx(k, "log_all", 1, REG_SZ, str(self.log_all.get()))
+        SetValueEx(k, "show_all", 1, REG_SZ, str(self.show_all.get()))
         CloseKey(k)
 
     def get_reg_vars(self):
@@ -191,32 +182,45 @@ class WindowsPloneInstaller:
         self.default_directory.set(int(QueryValueEx(k, "default_directory")[0]))
         self.default_password.set(int(QueryValueEx(k, "default_password")[0]))
         self.auto_restart.set(int(QueryValueEx(k, "auto_restart")[0]))
+        self.show_all.set(int(QueryValueEx(k, "show_all")[0]))
         CloseKey(k)
 
-    def run_PS(self, script_name):
+    def run_PS(self,script_name,pipe=True):
         script_path = self.base_path+"\\PS\\"+script_name
-        self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
-        ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
-        status = "normal"
-        while True:
-            line = ps_process.stdout.readline().decode("utf-8").rstrip()
-            if line != '':
-                if self.log_all.get():
-                    self.log(line)
-                else:
+
+        if pipe:
+            self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
+            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
+            status = "normal"
+            while True:
+                line = ps_process.stdout.readline().decode("utf-8").rstrip()
+                if line != '':
+                    if line[:2] != "**" & line[:2] != "*!":
+                        if self.show_all.get():
+                            self.log(line)
+                        else:
+                            self.log(line, display=False)
+
                     if line[:2] == "**": #this is a log flag echoed out from the powershell process.
                         self.log(line[2:])
-                if line[:2] == "*!": #this is an important status/command flag to the installer from the powershell process.
-                    status = line[2:]
-                    self.log(status)
-                    break #we need to get out of this loop before we proceed with the message for control flow
-            else:
-                break #No more lines to read from the PowerShell process.
+                    else:
+                        self.log(line, display=False)
 
-        if status == "normal":
-            return
+                    if line[:2] == "*!": #this is an important status/command flag to the installer from the powershell process.
+                        status = line[2:]
+                        self.log(status)
+                        break #we need to get out of this loop before we proceed with the message for control flow
+                else:
+                    break #No more lines to read from the PowerShell process.
+
+            if status == "normal":
+                return
+            else:
+                self.PS_status_handler(status)
         else:
-            self.PS_status_handler(status)
+            self.log("Please view follow PowerShell prompts to continue. Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
+            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path])
+            #we'll make sure to wait for these to finish before the python moves on.
 
     def PS_status_handler(self, status):
         if status == "Installing WSL":
@@ -230,10 +234,14 @@ class WindowsPloneInstaller:
         elif status == "Installing Plone on WSL":
             self.progress["value"] = 30
             self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
-        #elif status == "restart the machine":
-        #    self.set_reg_vars() #put user's installation config variables in registry for post-restart recovery
+        elif status == "Plone must restart the machine":
+            if self.auto_restart.get():
+                ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
+            else:
+                log("")
         elif status == "Elevating Process":
             self.log("Will restart executable as Admin; please accept any prompts.")
+            time.sleep(3) #Don't close the program before the user gets a chance to understand what's happening
             self.kill_app() #PowerShell will reopen as administrator
         elif status == "Running as Admin":
             self.okaybutton.configure(state="enabled")
@@ -242,33 +250,15 @@ class WindowsPloneInstaller:
             self.progress["value"] = 100
             self.clean_up()
 
-
-    #def wait_for_status_change(self, timeout):
-    #    k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-    #    count = 0
-    #    while self.install_status == self.last_status:
-    #        time.sleep(2) #to prevent this from overkill
-    #        self.install_status = QueryValueEx(k, "install_status")[0]
-    #        count += 1
-    #        if count == timeout:
-    #            self.install_status = "timed_out"
-    #            break
-    #    self.last_status = self.install_status
-    #    CloseKey(k)
-    #    return
-
-    def catch(self):
-        if self.install_status == "timed_out":
-                log("Installer process timed out!")
-
-    def log(self, message):
+    def log(self, message, display=True):
         with open(self.log_file, "a") as log:
             log.write(message+"\n")
-        self.log_text.config(state="normal")
-        self.log_text.insert(END, "> " + message + '\n')
-        self.log_text.config(state="disabled")
-        self.log_text.see(END)
-        self.gui.update()
+        if display:
+            self.log_text.config(state="normal")
+            self.log_text.insert(END, "> " + message + '\n')
+            self.log_text.config(state="disabled")
+            self.log_text.see(END)
+            self.gui.update()
 
     def clean_up(self):
         self.log('Cleaning up.')

@@ -16,10 +16,12 @@ if ($buildNumber -lt $requiredBuild) {
             echo "*!Installing WSL"
         }
     } else { #WinPloneInstaller.py will complete this code block
-        echo "**Enabling WSL. Please allow PowerShell to"
-        echo "*!restart the machine"
         $installerPath = (Get-ItemProperty -Path HKCU:\Software\PloneInstaller -Name installer_path).installer_path
         Set-ItemProperty HKCU:\Software\PloneInstaller install_status "enabling_wsl"
-        Set-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce "$installerPath"
+        Set-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce plone_installer "$installerPath"
         
         Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux
+        echo "**Enabling WSL."
+        echo "*!Plone must restart the machine"
+    }
+}
