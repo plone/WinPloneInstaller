@@ -1,5 +1,6 @@
 $requiredBuild = 15063
 $buildNumber = [int](Get-WmiObject win32_operatingsystem).buildNumber
+$ploneKey = 'HKCU:\Software\PloneInstaller'
 if ($buildNumber -lt $requiredBuild) {
     echo "**This system has Windows build number $buildNumber."
     echo "**Windows 10 with Creator's Update (build 15063) required to install on WSL (recommended)"
@@ -16,8 +17,8 @@ if ($buildNumber -lt $requiredBuild) {
             echo "*!Installing WSL"
         }
     } else { #WinPloneInstaller.py will complete this code block
-        $installerPath = (Get-ItemProperty -Path HKCU:\Software\PloneInstaller -Name installer_path).installer_path
-        Set-ItemProperty HKCU:\Software\PloneInstaller install_status "enabling_wsl"
+        $installerPath = (Get-ItemProperty -Path $ploneKey -Name installer_path).installer_path
+        Set-ItemProperty -Path $ploneKey install_status "enabling_wsl"
         Set-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce plone_installer "$installerPath"
         
         Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux

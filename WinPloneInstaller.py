@@ -19,7 +19,7 @@ class WindowsPloneInstaller:
         #self.run_once_key = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
 
         self.installer_path = os.path.realpath(__file__).split(".")[0]+".exe"
-        self.log_file = os.path.dirname(self.installer_path) + "\install.log"
+        self.log_path = os.path.dirname(self.installer_path) + "\install.log"
 
         try: #Grab installation state from registry if it exists
             k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
@@ -32,6 +32,7 @@ class WindowsPloneInstaller:
 
         SetValueEx(k, "base_path", 1, REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
         SetValueEx(k, "installer_path", 1, REG_SZ, self.installer_path)
+        SetValueEx(k, "log_path", 1, REG_SZ, self.log_path)
         CloseKey(k)
 
         self.last_status = self.install_status
@@ -156,7 +157,7 @@ class WindowsPloneInstaller:
             bash_script.write("\n"+install_call) #I've done this using ; for now because Windows new line characters are written instead of Unix ones.
 
             if self.start_plone.get():
-                bash_script.write("\nsudo /etc/Plone/zinstance/bin/plonectl start") #this line will start plone in WSL
+                bash_script.write("\nsudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl start") #this line will start plone in WSL
 
             #bash_script.write("\nrm -rf ") #this will delete the universal installer archive and directory
             bash_script.close()
@@ -194,22 +195,18 @@ class WindowsPloneInstaller:
             status = "normal"
             while True:
                 line = ps_process.stdout.readline().decode("utf-8").rstrip()
-                if line != '':
-                    if line[:2] != "**" & line[:2] != "*!":
+                if line != '':                    
+                    if line[:2] == "**": #this is a log flag echoed out from the powershell process.
+                        self.log(line[2:])
+                    elif line[:2] == "*!": #this is an important status/command flag to the installer from the powershell process.
+                        status = line[2:]
+                        self.log(status)
+                        break #we need to get out of this loop before we proceed with the message for control flow
+                    else:
                         if self.show_all.get():
                             self.log(line)
                         else:
                             self.log(line, display=False)
-
-                    if line[:2] == "**": #this is a log flag echoed out from the powershell process.
-                        self.log(line[2:])
-                    else:
-                        self.log(line, display=False)
-
-                    if line[:2] == "*!": #this is an important status/command flag to the installer from the powershell process.
-                        status = line[2:]
-                        self.log(status)
-                        break #we need to get out of this loop before we proceed with the message for control flow
                 else:
                     break #No more lines to read from the PowerShell process.
 
@@ -218,22 +215,24 @@ class WindowsPloneInstaller:
             else:
                 self.PS_status_handler(status)
         else:
-            self.log("Please view follow PowerShell prompts to continue. Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
+            self.log("Please follow PowerShell prompts to continue. Calling " + script_name + " in Microsoft PowerShell.")
             ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path])
-            #we'll make sure to wait for these to finish before the python moves on.
+            self.gui.withdraw() #We'll close our window and focus on PowerShell
+            ps_process.wait()
+            self.gui.deiconify()
 
     def PS_status_handler(self, status):
         if status == "Installing WSL":
             self.log('Linux Subsystem is enabled')
             self.progress["value"] = 10
-            self.run_PS("install_wsl.ps1")
+            self.run_PS("install_wsl.ps1", pipe=False)
         elif status == "Installing Plone with buildout":
             self.run_PS("install_choco.ps1") #This will install chocolatey and send status 'Chocolatey Installed'
         elif status == "Chocolatey Instaled":
             self.run_PS("install_plone_buildout.ps1")
         elif status == "Installing Plone on WSL":
             self.progress["value"] = 30
-            self.run_PS("install_plone_wsl.ps1") #Install Plone on the new instance of WSL
+            self.run_PS("install_plone_wsl.ps1", pipe=False) #Install Plone on the new instance of WSL
         elif status == "Plone must restart the machine":
             if self.auto_restart.get():
                 ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
@@ -251,7 +250,7 @@ class WindowsPloneInstaller:
             self.clean_up()
 
     def log(self, message, display=True):
-        with open(self.log_file, "a") as log:
+        with open(self.log_path, "a") as log:
             log.write(message+"\n")
         if display:
             self.log_text.config(state="normal")
