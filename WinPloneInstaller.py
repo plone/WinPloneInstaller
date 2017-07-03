@@ -164,7 +164,7 @@ class WindowsPloneInstaller:
             
         if self.start_plone.get():
             with open(self.base_path + "\\PS\\install_plone_buildout.ps1", "a") as buildout_script:
-                    buildout_script.write('\nbin\instance start')
+                    buildout_script.write('\nbin\instance fg')
 
                     buildout_script.close()
                         
@@ -186,10 +186,10 @@ class WindowsPloneInstaller:
         self.show_all.set(int(QueryValueEx(k, "show_all")[0]))
         CloseKey(k)
 
-    def run_PS(self,script_name,pipe=True):
+    def run_PS(self,script_name, pipe=True, hide=True):
         script_path = self.base_path+"\\PS\\"+script_name
 
-        if pipe:
+        if pipe and hide:
             self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
             ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
             status = "normal"
@@ -214,7 +214,11 @@ class WindowsPloneInstaller:
                 return
             else:
                 self.PS_status_handler(status)
-        else:
+        elif hide:
+            self.log("Calling " + script_name + " in Microsoft PowerShell, it should remain hidden.")
+            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". " + script_path])
+            ps_process.wait()
+        else: #This will have to change if there's ever a reason for pipe=True & hide=False (doubtful)
             self.log("Please follow PowerShell prompts to continue. Calling " + script_name + " in Microsoft PowerShell.")
             ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path])
             self.gui.withdraw() #We'll close our window and focus on PowerShell
@@ -225,14 +229,15 @@ class WindowsPloneInstaller:
         if status == "Installing WSL":
             self.log('Linux Subsystem is enabled')
             self.progress["value"] = 10
-            self.run_PS("install_wsl.ps1", pipe=False)
+            self.run_PS("install_wsl.ps1", pipe=False, hide=False)
         elif status == "Installing Plone with buildout":
-            self.run_PS("install_choco.ps1") #This will install chocolatey and send status 'Chocolatey Installed'
-        elif status == "Chocolatey Instaled":
-            self.run_PS("install_plone_buildout.ps1")
+            self.run_PS("install_choco.ps1", pipe=False) #This will install chocolatey and send status 'Chocolatey Installed'
+            self.log("Chocolatey Installed")
+            self.run_PS("install_plone_buildout.ps1", pipe=False, hide=False)
+            self.log("Installation Complete")
         elif status == "Installing Plone on WSL":
             self.progress["value"] = 30
-            self.run_PS("install_plone_wsl.ps1", pipe=False) #Install Plone on the new instance of WSL
+            self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
         elif status == "Plone must restart the machine":
             if self.auto_restart.get():
                 ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])

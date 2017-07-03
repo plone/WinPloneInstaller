@@ -1,4 +1,4 @@
-$host.ui.RawUI.WindowTitle = “Installing Plone on WSL”
+$host.ui.RawUI.WindowTitle = "Installing Plone on WSL"
 $ploneKey = 'HKCU:\Software\PloneInstaller'
 $plonePath = (Get-ItemProperty -Path $ploneKey -Name base_path).base_path
 Set-Location $plonePath
