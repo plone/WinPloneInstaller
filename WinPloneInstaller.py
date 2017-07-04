@@ -191,7 +191,7 @@ class WindowsPloneInstaller:
 
         if pipe and hide:
             self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
-            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
+            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Unrestricted", "-WindowStyle", "Hidden", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
             status = "normal"
             while True:
                 line = ps_process.stdout.readline().decode("utf-8").rstrip()
@@ -216,11 +216,11 @@ class WindowsPloneInstaller:
                 self.PS_status_handler(status)
         elif hide:
             self.log("Calling " + script_name + " in Microsoft PowerShell, it should remain hidden.")
-            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". " + script_path])
+            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Unrestricted", "-WindowStyle", "Hidden", ". " + script_path])
             ps_process.wait()
         else: #This will have to change if there's ever a reason for pipe=True & hide=False (doubtful)
             self.log("Please follow PowerShell prompts to continue. Calling " + script_name + " in Microsoft PowerShell.")
-            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", ". " + script_path])
+            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Unrestricted", ". " + script_path])
             self.gui.withdraw() #We'll close our window and focus on PowerShell
             ps_process.wait()
             self.gui.deiconify()
