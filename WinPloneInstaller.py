@@ -1,7 +1,7 @@
-import subprocess as sp
 import os
-import io
 import platform
+import io
+import subprocess as sp
 import time
 from winreg import *
 from tkinter import *
@@ -118,13 +118,14 @@ class WindowsPloneInstaller:
             self.log("No previous installation config found.", display=False)
 
         if self.install_status == "enabling_wsl":
+            self.okaybutton.configure(state="disabled")
             self.log("Picking up where we left off. Installing Linux Subsystem...")
             self.run_PS("install_wsl.ps1")
 
         if self.build_number < self.required_build:
             self.log("This system has Windows build number " + str(self.build_number))
             self.log("Windows 10 with Creator's Update (build 15063) required to install on WSL (recommended)")
-            self.log("Installing Plone with buildout")
+            self.log("Will install Plone with buildout, configure and select Okay")
             default_pass_button.grid_forget() #default password is always used for buildout version
             self.auto_restart_checkbutton.grid_forget() #No restart necessary for buildout version
             window_height = 275
@@ -140,55 +141,54 @@ class WindowsPloneInstaller:
         self.gui.mainloop()
         
     def okay_handler(self, event):
+        self.okaybutton.configure(state="disabled")
         self.set_reg_vars()
         if self.install_status == "elevated":
             self.init_install()
-        else:
-            self.log("We need to run the installer as Administrator") #This shouldn't happen, elevate.ps1 should take care of it.
+        elif self.install_status == "enabling_wsl":
+            self.log("Installation should continue after the machine restarts, thank you.")
+            time.sleep(3)
+            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
 
     def cancel_handler(self, event):
         self.kill_app()
 
     def init_install(self):
-
-        self.okaybutton.configure(state="disabled")
-
         self.update_scripts()
+        self.progress["value"] = 10
 
         if self.build_number < self.required_build:
-            self.run_PS("install_choco.ps1", pipe=False)
-            self.log("Chocolatey Installed")
-            self.run_PS("install_plone_buildout.ps1", pipe=False, hide=False)
-            self.log("Installation Complete")
+            self.install_plone_buildout()
         else:
             self.run_PS("enable_wsl.ps1")
 
     def update_scripts(self):
-        install_call = "sudo ./install.sh"
+        if self.build_number >= self.required_build:
+            install_call = "sudo ./install.sh"
 
-        if self.default_password.get():
-            install_call += " --password=admin"
+            if self.default_password.get():
+                install_call += " --password=admin"
 
-        if self.default_directory.get():
-            install_call += " --target=/etc/Plone"
+            if self.default_directory.get():
+                install_call += " --target=/etc/Plone"
 
-        install_call += " standalone"
+            install_call += " standalone"
 
-        with io.open(self.base_path + "\\bash\\plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
-            bash_script.write("\n"+install_call) #I've done this using ; for now because Windows new line characters are written instead of Unix ones.
+            with io.open(self.base_path + "\\bash\\plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
+                bash_script.write("\n"+install_call) #I've done this using ; for now because Windows new line characters are written instead of Unix ones.
 
-            if self.start_plone.get():
-                bash_script.write("\nsudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl start") #this line will start plone in WSL
+                bash_script.close()
 
-            #bash_script.write("\nrm -rf ") #this will delete the universal installer archive and directory
-            bash_script.close()
-            
-        if self.start_plone.get():
-            with open(self.base_path + "\\PS\\install_plone_buildout.ps1", "a") as buildout_script:
-                    buildout_script.write('\nbin\instance fg')
+    def install_plone_buildout(self):
+            self.log("Installing Chocolatey package manager...")
+            self.run_PS("install_choco.ps1", pipe=False)
+            self.log("Chocolatey Installed")
+            self.progress["value"] = 25
+            self.run_PS("install_plone_buildout.ps1", pipe=False, hide=False)
+            self.progress["value"] = 95
+            self.log("Installation Complete")
+            self.clean_up()
 
-                    buildout_script.close()
-                        
     def set_reg_vars(self):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
         SetValueEx(k, "start_plone", 1, REG_SZ, str(self.start_plone.get()))
@@ -211,6 +211,7 @@ class WindowsPloneInstaller:
         if pipe and hide:
             self.log("Calling " + script_name + " in Microsoft PowerShell, please accept any prompts.")
             ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Unrestricted", "-WindowStyle", "Hidden", ". " + script_path], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
+
             status = "normal"
             while True:
                 line = ps_process.stdout.readline().decode("utf-8").rstrip()
@@ -244,25 +245,20 @@ class WindowsPloneInstaller:
     def PS_status_handler(self, status):
         if status == "Installing WSL":
             self.log('Linux Subsystem is enabled')
-            self.progress["value"] = 10
+            self.progress["value"] = 20
             self.run_PS("install_wsl.ps1", pipe=False, hide=False)
         elif status == "Installing Plone on WSL":
-            self.progress["value"] = 30
+            self.progress["value"] = 35
             self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
         elif status == "Plone must restart the machine":
             if self.auto_restart.get():
                 ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
             else:
-                log("")
-        elif status == "Elevating Process":
-            self.log("Will restart executable as Admin; please accept any prompts.")
-            time.sleep(3) #Don't close the program before the user gets a chance to understand what's happening
-            self.kill_app() #PowerShell will reopen as administrator
-        elif status == "Running as Admin":
-            self.okaybutton.configure(state="enabled")
-            self.log("Press 'Okay' to launch PowerShell, gather information about your system and prepare to install Plone.")
+                self.install_status = "enabling_wsl"
+                self.okaybutton.configure(state="enabled")
+                log("Please press Okay when you're ready!")
         elif status == "Plone Installed Succesffully":
-            self.progress["value"] = 100
+            self.progress["value"] = 95
             self.clean_up()
 
     def log(self, message, display=True):
@@ -275,15 +271,37 @@ class WindowsPloneInstaller:
             self.log_text.see(END)
             self.gui.update()
 
+    def run_plone(self):
+        with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
+            if self.build_number >= self.required_build:
+                start_script.write('\nbash -c "sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl start"') #this line will start plone in WSL
+            else:
+                start_script.write('\nC:\bin\instance fg')
+
+            start_script.close()
+        self.run_PS("start_plone.ps1", pipe=False, hide=False)
+
     def clean_up(self):
         self.log('Cleaning up.')
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        DeleteKey(k, "install_status")
+        DeleteKey(k, "auto_restart")
         DeleteKey(k, "base_path")
+        DeleteKey(k, "build_number")
+        DeleteKey(k, "default_directory")
+        DeleteKey(k, "default_password")
+        DeleteKey(k, "install_status")
         DeleteKey(k, "installer_path")
-        DeleteKey(k, "win_version")
+        DeleteKey(k, "log_path")
+        DeleteKey(k, "show_all")
+        DeleteKey(k, "start_plone")
         CloseKey(k)
         DeleteKey(HKEY_CURRENT_USER, self.plone_key)
+        self.progress["value"] = 100
+        self.log("Thank you! The installer will close.")
+        time.sleep(5)
+        if self.start_plone:
+            self.run_plone()
+        self.kill_app()
 
     def kill_app(self):
         sys.exit(0)

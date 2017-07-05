@@ -1,0 +1,1 @@
+$ploneKey = 'HKCU:\Software\PloneInstaller'
