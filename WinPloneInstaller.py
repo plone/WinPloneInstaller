@@ -37,7 +37,24 @@ class WindowsPloneInstaller:
 
         self.last_status = self.install_status
 
+        if self.install_status == "begin":
+            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+            self.install_status = "elevated"
+            SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
+            CloseKey(k)
+            self.run_PS("elevate.ps1", pipe=False)
+            self.kill_app()
+
+        self.required_build = 15063
+        self.get_build_number()
+
         self.init_GUI()
+
+    def get_build_number(self):
+        self.run_PS("get_build_number.ps1", pipe=False)
+        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+        self.build_number = int(QueryValueEx(k, "build_number")[0])
+        CloseKey(k)
 
     def init_GUI(self):
         self.gui = Tk()
@@ -48,7 +65,6 @@ class WindowsPloneInstaller:
         self.fr1.pack(side="top")
 
         self.start_plone = IntVar(value=1)
-        self.show_all = IntVar(value=0)
         self.default_password = IntVar(value=1)
         self.default_directory = IntVar(value=1)
         self.auto_restart = IntVar(value=1)
@@ -70,19 +86,17 @@ class WindowsPloneInstaller:
         Checkbutton(self.fr1, text="Start Plone after installation", variable=self.start_plone).grid(row=2,sticky="EW")
 
         #GUI Row 3
-        Checkbutton(self.fr1, text="Show all PowerShell output", variable=self.show_all).grid(row=3,sticky="EW")
+        default_pass_button = Checkbutton(self.fr1, text="Use username:admin password:admin for Plone (otherwise be prompted)", variable=self.default_password)
+        default_pass_button.grid(row=3,sticky="EW")
 
-        #GUI Row 4
-        Checkbutton(self.fr1, text="Use username:admin password:admin for Plone (otherwise be prompted)", variable=self.default_password).grid(row=4,sticky="EW")
+         #GUI Row 4
+        Checkbutton(self.fr1, text="Install to default directory (otherwise be prompted)", variable=self.default_directory).grid(row=4, sticky="EW")
 
          #GUI Row 5
-        Checkbutton(self.fr1, text="Install to default directory (/etc/Plone, otherwise be prompted)", variable=self.default_directory).grid(row=5, sticky="EW")
-
-         #GUI Row 6
         self.auto_restart_checkbutton = Checkbutton(self.fr1, text="Reboot automatically (otherwise be prompted)", variable=self.auto_restart)
-        self.auto_restart_checkbutton.grid(row=6,stick="EW")
+        self.auto_restart_checkbutton.grid(row=5,stick="EW")
 
-        #GUI Row 7
+        #GUI Row 6
         button_frame = Frame(self.fr1)
 
         self.okaybutton = Button(button_frame, text="Okay")
@@ -94,14 +108,7 @@ class WindowsPloneInstaller:
         cancelbutton.bind("<Button>", self.cancel_handler)
         self.fin = ''
 
-        button_frame.grid(row=7)
-
-        #GUI Settings
-        ws = self.gui.winfo_screenwidth()
-        hs = self.gui.winfo_screenheight()
-        x = (ws/2) - (window_width/2)
-        y = (hs/2) - (window_height/2)
-        self.gui.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
+        button_frame.grid(row=6)
 
         self.log("Welcome to Plone Installer for Windows.")
 
@@ -110,27 +117,34 @@ class WindowsPloneInstaller:
         except:
             self.log("No previous installation config found.", display=False)
 
-        if self.install_status == "begin":
-            self.log("Press 'Okay' to launch PowerShell and make sure we are running as Administrator")
-        elif self.install_status == "elevated":
-            self.log("Running as Administrator; thank you")
-            self.init_install()
-        elif self.install_status == "enabling_wsl":
+        if self.install_status == "enabling_wsl":
             self.log("Picking up where we left off. Installing Linux Subsystem...")
             self.run_PS("install_wsl.ps1")
+
+        if self.build_number < self.required_build:
+            self.log("This system has Windows build number " + str(self.build_number))
+            self.log("Windows 10 with Creator's Update (build 15063) required to install on WSL (recommended)")
+            self.log("Installing Plone with buildout")
+            default_pass_button.grid_forget() #default password is always used for buildout version
+            self.auto_restart_checkbutton.grid_forget() #No restart necessary for buildout version
+            window_height = 275
+            self.fr1.config(height=window_height)
+
+        #GUI Settings
+        ws = self.gui.winfo_screenwidth()
+        hs = self.gui.winfo_screenheight()
+        x = (ws/2) - (window_width/2)
+        y = (hs/2) - (window_height/2)
+        self.gui.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
 
         self.gui.mainloop()
         
     def okay_handler(self, event):
         self.set_reg_vars()
-        if self.install_status == "begin":
-            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-            self.install_status = "elevated"
-            SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
-            CloseKey(k)
-            self.run_PS("elevate.ps1")
-        elif self.install_status == "elevated":
+        if self.install_status == "elevated":
             self.init_install()
+        else:
+            self.log("We need to run the installer as Administrator") #This shouldn't happen, elevate.ps1 should take care of it.
 
     def cancel_handler(self, event):
         self.kill_app()
@@ -140,7 +154,14 @@ class WindowsPloneInstaller:
         self.okaybutton.configure(state="disabled")
 
         self.update_scripts()
-        self.run_PS("enable_wsl.ps1") #Make sure WSL is enabled and check if it is already installed
+
+        if self.build_number < self.required_build:
+            self.run_PS("install_choco.ps1", pipe=False)
+            self.log("Chocolatey Installed")
+            self.run_PS("install_plone_buildout.ps1", pipe=False, hide=False)
+            self.log("Installation Complete")
+        else:
+            self.run_PS("enable_wsl.ps1")
 
     def update_scripts(self):
         install_call = "sudo ./install.sh"
@@ -174,7 +195,6 @@ class WindowsPloneInstaller:
         SetValueEx(k, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
         SetValueEx(k, "default_password", 1, REG_SZ, str(self.default_password.get()))
         SetValueEx(k, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
-        SetValueEx(k, "show_all", 1, REG_SZ, str(self.show_all.get()))
         CloseKey(k)
 
     def get_reg_vars(self):
@@ -183,7 +203,6 @@ class WindowsPloneInstaller:
         self.default_directory.set(int(QueryValueEx(k, "default_directory")[0]))
         self.default_password.set(int(QueryValueEx(k, "default_password")[0]))
         self.auto_restart.set(int(QueryValueEx(k, "auto_restart")[0]))
-        self.show_all.set(int(QueryValueEx(k, "show_all")[0]))
         CloseKey(k)
 
     def run_PS(self,script_name, pipe=True, hide=True):
@@ -203,10 +222,7 @@ class WindowsPloneInstaller:
                         self.log(status)
                         break #we need to get out of this loop before we proceed with the message for control flow
                     else:
-                        if self.show_all.get():
-                            self.log(line)
-                        else:
-                            self.log(line, display=False)
+                        self.log(line, display=False)
                 else:
                     break #No more lines to read from the PowerShell process.
 
@@ -215,7 +231,7 @@ class WindowsPloneInstaller:
             else:
                 self.PS_status_handler(status)
         elif hide:
-            self.log("Calling " + script_name + " in Microsoft PowerShell, it should remain hidden.")
+            #self.log("Calling " + script_name + " in Microsoft PowerShell, it should remain hidden.")
             ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Unrestricted", "-WindowStyle", "Hidden", ". " + script_path])
             ps_process.wait()
         else: #This will have to change if there's ever a reason for pipe=True & hide=False (doubtful)
@@ -230,11 +246,6 @@ class WindowsPloneInstaller:
             self.log('Linux Subsystem is enabled')
             self.progress["value"] = 10
             self.run_PS("install_wsl.ps1", pipe=False, hide=False)
-        elif status == "Installing Plone with buildout":
-            self.run_PS("install_choco.ps1", pipe=False) #This will install chocolatey and send status 'Chocolatey Installed'
-            self.log("Chocolatey Installed")
-            self.run_PS("install_plone_buildout.ps1", pipe=False, hide=False)
-            self.log("Installation Complete")
         elif status == "Installing Plone on WSL":
             self.progress["value"] = 30
             self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
