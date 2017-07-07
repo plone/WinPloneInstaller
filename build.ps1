@@ -1,1 +1,1 @@
-pyinstaller --add-data './PS/*;./PS' --add-data './bash/*;./bash' --onefile --windowed --icon=./resources/plone.ico -F WinPloneInstaller.py
+pyinstaller --add-data './PS/*;./PS' --add-data './bash/*;./bash' --add-data './resources/plone.png;./resources' --onefile --windowed --icon=./resources/plone.ico -F WinPloneInstaller.py

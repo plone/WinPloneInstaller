@@ -6,6 +6,7 @@ import time
 from winreg import *
 from tkinter import *
 from tkinter.ttk import *
+from PIL import Image, ImageTk
 
 class WindowsPloneInstaller:
 
@@ -99,12 +100,17 @@ class WindowsPloneInstaller:
         #GUI Row 6
         button_frame = Frame(self.fr1)
 
+        load_logo = Image.open(self.base_path + '\\resources\\plone.png')
+        logo = ImageTk.PhotoImage(load_logo.resize((45, 45), Image.ANTIALIAS))
+        img = Label(button_frame, image=logo)
+        img.grid(row=0, column=0, sticky="E")
+
         self.okaybutton = Button(button_frame, text="Okay")
-        self.okaybutton.grid(row = 0, column=0, sticky="W")
+        self.okaybutton.grid(row = 0, column=1, sticky="E")
         self.okaybutton.bind("<Button>", self.okay_handler)
 
         cancelbutton = Button(button_frame, text="Cancel")
-        cancelbutton.grid(row = 0, column = 1, sticky="E")
+        cancelbutton.grid(row = 0, column = 2, sticky="W")
         cancelbutton.bind("<Button>", self.cancel_handler)
         self.fin = ''
 
