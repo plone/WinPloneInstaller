@@ -132,10 +132,11 @@ class WindowsPloneInstaller:
             self.log("This system has Windows build number " + str(self.build_number))
             self.log("Windows 10 with Creator's Update (build 15063) required to install on WSL (recommended)")
             self.log("Will install Plone with buildout, configure and select Okay")
-            default_pass_button.grid_forget() #default password is always used for buildout version
-            self.auto_restart_checkbutton.grid_forget() #No restart necessary for buildout version
-            window_height = 275
-            self.fr1.config(height=window_height)
+            #following lines commented out due to Win7 trouble, finding alternative solution
+            #default_pass_button.grid_forget() #default password is always used for buildout version
+            #self.auto_restart_checkbutton.grid_forget() #No restart necessary for buildout version
+            #window_height = 275
+            #self.fr1.config(height=window_height)
 
         #GUI Settings
         ws = self.gui.winfo_screenwidth()
