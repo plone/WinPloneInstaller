@@ -301,19 +301,6 @@ class WindowsPloneInstaller:
 
     def clean_up(self):
         self.log('Cleaning up.')
-        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        DeleteKey(k, "auto_restart")
-        DeleteKey(k, "base_path")
-        DeleteKey(k, "build_number")
-        DeleteKey(k, "default_directory")
-        DeleteKey(k, "install_directory")
-        DeleteKey(k, "default_password")
-        DeleteKey(k, "install_status")
-        DeleteKey(k, "installer_path")
-        DeleteKey(k, "log_path")
-        DeleteKey(k, "show_all")
-        DeleteKey(k, "start_plone")
-        CloseKey(k)
         DeleteKey(HKEY_CURRENT_USER, self.plone_key)
         self.progress["value"] = 100
         self.log("Thank you! The installer will close.")
