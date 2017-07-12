@@ -24,26 +24,21 @@ class WindowsPloneInstaller:
         self.log_path = os.path.dirname(self.installer_path) + "\install.log"
 
         try: #Grab installation state from registry if it exists
-            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-            self.install_status = QueryValueEx(k, "install_status")[0]
+            self.reg_key = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+            self.install_status = QueryValueEx(self.reg_key, "install_status")[0]
 
         except: #Otherwise create it with ititial "begin" value
-            k = CreateKey(HKEY_CURRENT_USER, self.plone_key)
+            self.reg_key = CreateKey(HKEY_CURRENT_USER, self.plone_key)
             self.install_status = "begin"
-            SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
+            SetValueEx(self.reg_key, "install_status", 1, REG_SZ, self.install_status)
 
-        SetValueEx(k, "base_path", 1, REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
-        SetValueEx(k, "installer_path", 1, REG_SZ, self.installer_path)
-        SetValueEx(k, "log_path", 1, REG_SZ, self.log_path)
-        CloseKey(k)
-
-        self.last_status = self.install_status
+        SetValueEx(self.reg_key, "base_path", 1, REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
+        SetValueEx(self.reg_key, "installer_path", 1, REG_SZ, self.installer_path)
+        SetValueEx(self.reg_key, "log_path", 1, REG_SZ, self.log_path)
 
         if self.install_status == "begin":
-            k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
             self.install_status = "elevated"
-            SetValueEx(k, "install_status", 1, REG_SZ, self.install_status)
-            CloseKey(k)
+            SetValueEx(self.reg_key, "install_status", 1, REG_SZ, self.install_status)
             self.run_PS("elevate.ps1", pipe=False)
             self.kill_app()
 
@@ -54,9 +49,7 @@ class WindowsPloneInstaller:
 
     def get_build_number(self):
         self.run_PS("get_build_number.ps1", pipe=False)
-        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        self.build_number = int(QueryValueEx(k, "build_number")[0])
-        CloseKey(k)
+        self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0])
 
     def init_GUI(self):
         self.gui = Tk()
@@ -125,16 +118,14 @@ class WindowsPloneInstaller:
             self.log("No previous installation config found.", display=False)
 
         if self.install_status == "enabling_wsl":
-            self.okaybutton.configure(state="disabled")
-            self.log("Picking up where we left off. Installing Linux Subsystem...")
-            self.run_PS("install_wsl.ps1")
+            self.install_plone_wsl()
 
         if self.build_number < self.required_build:
             self.log("This system has Windows build number " + str(self.build_number))
             self.log("Windows 10 with Creator's Update (build 15063) required to install on WSL (recommended)")
             self.log("Will install Plone with buildout, configure and select Okay")
-            default_pass_button.grid_remove() #default password is always used for buildout version
-            self.auto_restart_checkbutton.grid_remove() #No restart necessary for buildout version
+            default_pass_button.grid_forget() #default password is always used for buildout version
+            self.auto_restart_checkbutton.grid_forget() #No restart necessary for buildout version
             window_height = 290
             self.fr1.config(height=window_height)
 
@@ -161,43 +152,26 @@ class WindowsPloneInstaller:
         self.kill_app()
 
     def init_install(self):
-        self.update_scripts()
-        self.progress["value"] = 10
-
         if self.build_number < self.required_build:
             self.install_plone_buildout()
         else:
-            self.run_PS("enable_wsl.ps1")
-
-    def update_scripts(self):
-        if self.build_number >= self.required_build:
-            install_call = "sudo ./install.sh"
-
-            if self.default_password.get():
-                install_call += " --password=admin"
-
-            if self.default_directory.get():
-                install_call += " --target=/etc/Plone"
-
-            install_call += " standalone"
-
-            with io.open(self.base_path + "\\bash\\plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
-                bash_script.write("\n"+install_call)
-
-                bash_script.close()
+            self.install_plone_wsl()
 
     def install_plone_buildout(self):
         if self.default_directory.get():
+            self.log("Will install to C:\Plone")
             install_directory = "C:\\"
         else:
             install_directory = ''
+            self.log("A dialog will appear. \Plone directory will be added to the one you choose.")
+            time.sleep(4)
+
             while install_directory == '': #make sure user selects a valid directory
                 install_directory = filedialog.askdirectory()
 
-        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        SetValueEx(k, "install_directory", 1, REG_SZ, install_directory)
-        CloseKey(k)
+        SetValueEx(self.reg_key, "install_directory", 1, REG_SZ, install_directory)
 
+        self.progress["value"] = 5 #Don't want them to worry while Chocolatey installs :)
         self.log("Installing Chocolatey package manager...")
         self.run_PS("install_choco.ps1", pipe=False)
         self.log("Chocolatey Installed")
@@ -206,22 +180,43 @@ class WindowsPloneInstaller:
         self.progress["value"] = 95
         self.log("Installation Complete")
         self.clean_up()
+            
+    def install_plone_wsl(self):
+        if self.install_status == "enabling_wsl":
+            self.okaybutton.configure(state="disabled")
+            self.log("Picking up where we left off. Installing Linux Subsystem...")
+            self.run_PS("install_wsl.ps1")
+        else:
+            self.update_bash_script()
+            self.run_PS("enable_wsl.ps1")
+
+    def update_bash_script():
+        install_call = "sudo ./install.sh"
+
+        if self.default_password.get():
+            install_call += " --password=admin"
+
+        if self.default_directory.get():
+            install_call += " --target=/etc/Plone"
+
+        install_call += " standalone"
+
+        with io.open(self.base_path + "\\bash\\plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
+            bash_script.write("\n"+install_call)
+
+            bash_script.close()
 
     def set_reg_vars(self):
-        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        SetValueEx(k, "start_plone", 1, REG_SZ, str(self.start_plone.get()))
-        SetValueEx(k, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
-        SetValueEx(k, "default_password", 1, REG_SZ, str(self.default_password.get()))
-        SetValueEx(k, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
-        CloseKey(k)
+        SetValueEx(self.reg_key, "start_plone", 1, REG_SZ, str(self.start_plone.get()))
+        SetValueEx(self.reg_key, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
+        SetValueEx(self.reg_key, "default_password", 1, REG_SZ, str(self.default_password.get()))
+        SetValueEx(self.reg_key, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
 
     def get_reg_vars(self):
-        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
-        self.start_plone.set(int(QueryValueEx(k, "start_plone")[0]))
-        self.default_directory.set(int(QueryValueEx(k, "default_directory")[0]))
-        self.default_password.set(int(QueryValueEx(k, "default_password")[0]))
-        self.auto_restart.set(int(QueryValueEx(k, "auto_restart")[0]))
-        CloseKey(k)
+        self.start_plone.set(int(QueryValueEx(self.reg_key, "start_plone")[0]))
+        self.default_directory.set(int(QueryValueEx(self.reg_key, "default_directory")[0]))
+        self.default_password.set(int(QueryValueEx(self.reg_key, "default_password")[0]))
+        self.auto_restart.set(int(QueryValueEx(self.reg_key, "auto_restart")[0]))
 
     def run_PS(self,script_name, pipe=True, hide=True):
         script_path = self.base_path+"\\PS\\"+script_name
@@ -250,7 +245,6 @@ class WindowsPloneInstaller:
             else:
                 self.PS_status_handler(status)
         elif hide:
-            #self.log("Calling " + script_name + " in Microsoft PowerShell, it should remain hidden.")
             ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Unrestricted", "-WindowStyle", "Hidden", ". " + script_path])
             ps_process.wait()
         else: #This will have to change if there's ever a reason for pipe=True & hide=False (doubtful)
@@ -270,6 +264,7 @@ class WindowsPloneInstaller:
             self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
         elif status == "Plone must restart the machine":
             if self.auto_restart.get():
+                CloseKey(self.reg_key)
                 ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
             else:
                 self.install_status = "enabling_wsl"
@@ -301,12 +296,14 @@ class WindowsPloneInstaller:
 
     def clean_up(self):
         self.log('Cleaning up.')
+        CloseKey(self.reg_key)
         DeleteKey(HKEY_CURRENT_USER, self.plone_key)
         self.progress["value"] = 100
         self.log("Thank you! The installer will close.")
         time.sleep(5)
         if self.start_plone.get():
             self.run_plone()
+
         self.kill_app()
 
     def kill_app(self):
