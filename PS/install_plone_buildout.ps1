@@ -1,6 +1,7 @@
 $host.ui.RawUI.WindowTitle = "Installing Plone with Buildout"
 $ploneKey = 'HKCU:\Software\PloneInstaller'
 $plonePath = (Get-ItemProperty -Path $ploneKey -Name base_path).base_path
+$installDirectory = (Get-ItemProperty -Path $ploneKey -Name install_directory).install_directory
 . "$plonePath\PS\log.ps1"
 
 log("Configuring Chocolatey")
@@ -23,9 +24,10 @@ pip install virtualenv
 
 log("Cloning simple-plone-buildout")
 
-Set-Location "C:\"
+Set-Location $installDirectory
 git clone https://github.com/plone/simple-plone-buildout
-Set-Location simple-plone-buildout
+Rename-Item simple-plone-buildout Plone
+Set-Location Plone
 Copy-Item profiles\buildout.cfg.tmpl buildout.cfg
 virtualenv -p C:\python27\python.exe env
 env\Scripts\pip install -r requirements.txt

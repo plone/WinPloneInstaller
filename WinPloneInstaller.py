@@ -6,6 +6,7 @@ import time
 from winreg import *
 from tkinter import *
 from tkinter.ttk import *
+import tkinter.filedialog as filedialog
 from PIL import Image, ImageTk
 
 class WindowsPloneInstaller:
@@ -132,11 +133,10 @@ class WindowsPloneInstaller:
             self.log("This system has Windows build number " + str(self.build_number))
             self.log("Windows 10 with Creator's Update (build 15063) required to install on WSL (recommended)")
             self.log("Will install Plone with buildout, configure and select Okay")
-            #following lines commented out due to Win7 trouble, finding alternative solution
-            #default_pass_button.grid_forget() #default password is always used for buildout version
-            #self.auto_restart_checkbutton.grid_forget() #No restart necessary for buildout version
-            #window_height = 275
-            #self.fr1.config(height=window_height)
+            default_pass_button.grid_remove() #default password is always used for buildout version
+            self.auto_restart_checkbutton.grid_remove() #No restart necessary for buildout version
+            window_height = 290
+            self.fr1.config(height=window_height)
 
         #GUI Settings
         ws = self.gui.winfo_screenwidth()
@@ -182,19 +182,30 @@ class WindowsPloneInstaller:
             install_call += " standalone"
 
             with io.open(self.base_path + "\\bash\\plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
-                bash_script.write("\n"+install_call) #I've done this using ; for now because Windows new line characters are written instead of Unix ones.
+                bash_script.write("\n"+install_call)
 
                 bash_script.close()
 
     def install_plone_buildout(self):
-            self.log("Installing Chocolatey package manager...")
-            self.run_PS("install_choco.ps1", pipe=False)
-            self.log("Chocolatey Installed")
-            self.progress["value"] = 25
-            self.run_PS("install_plone_buildout.ps1", pipe=False, hide=False)
-            self.progress["value"] = 95
-            self.log("Installation Complete")
-            self.clean_up()
+        if self.default_directory.get():
+            install_directory = "C:\\"
+        else:
+            install_directory = ''
+            while install_directory == '': #make sure user selects a valid directory
+                install_directory = filedialog.askdirectory()
+
+        k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
+        SetValueEx(k, "install_directory", 1, REG_SZ, install_directory)
+        CloseKey(k)
+
+        self.log("Installing Chocolatey package manager...")
+        self.run_PS("install_choco.ps1", pipe=False)
+        self.log("Chocolatey Installed")
+        self.progress["value"] = 25
+        self.run_PS("install_plone_buildout.ps1", pipe=False, hide=False)
+        self.progress["value"] = 95
+        self.log("Installation Complete")
+        self.clean_up()
 
     def set_reg_vars(self):
         k = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
@@ -295,6 +306,7 @@ class WindowsPloneInstaller:
         DeleteKey(k, "base_path")
         DeleteKey(k, "build_number")
         DeleteKey(k, "default_directory")
+        DeleteKey(k, "install_directory")
         DeleteKey(k, "default_password")
         DeleteKey(k, "install_status")
         DeleteKey(k, "installer_path")
@@ -306,7 +318,7 @@ class WindowsPloneInstaller:
         self.progress["value"] = 100
         self.log("Thank you! The installer will close.")
         time.sleep(5)
-        if self.start_plone:
+        if self.start_plone.get():
             self.run_plone()
         self.kill_app()
 
