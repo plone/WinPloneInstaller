@@ -1,3 +1,3 @@
-It should be optional for user to see the Powershell/Bash windows pop up or just stay on the GUI
+Fix start_plone for varying installation directory (grab from registry before clean up)
 
 Need to add option to install the developer tools with bin/buildout -c develop.cfg

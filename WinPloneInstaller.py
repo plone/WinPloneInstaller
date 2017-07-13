@@ -144,9 +144,7 @@ class WindowsPloneInstaller:
         if self.install_status == "elevated":
             self.init_install()
         elif self.install_status == "enabling_wsl":
-            self.log("Installation should continue after the machine restarts, thank you.")
-            time.sleep(3)
-            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
+            self.restart_computer()
 
     def cancel_handler(self, event):
         self.kill_app()
@@ -163,7 +161,7 @@ class WindowsPloneInstaller:
             install_directory = "C:\\"
         else:
             install_directory = ''
-            self.log("A dialog will appear. \Plone directory will be added to the one you choose.")
+            self.log("A dialog will appear. A \Plone directory will be added to the one you choose.")
             time.sleep(4)
 
             while install_directory == '': #make sure user selects a valid directory
@@ -264,8 +262,7 @@ class WindowsPloneInstaller:
             self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
         elif status == "Plone must restart the machine":
             if self.auto_restart.get():
-                CloseKey(self.reg_key)
-                ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
+                self.restart_computer()
             else:
                 self.install_status = "enabling_wsl"
                 self.okaybutton.configure(state="enabled")
@@ -283,6 +280,12 @@ class WindowsPloneInstaller:
             self.log_text.config(state="disabled")
             self.log_text.see(END)
             self.gui.update()
+
+    def restart_computer(self):
+        self.log("Installation should continue after the machine restarts, thank you.")
+        CloseKey(self.reg_key)
+        time.sleep(3)
+        ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
 
     def run_plone(self):
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
