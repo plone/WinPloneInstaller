@@ -260,6 +260,9 @@ class WindowsPloneInstaller:
         elif status == "Installing Plone on WSL":
             self.progress["value"] = 35
             self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
+            self.log("Plone Intstalled Successfully")
+            self.progress["value"] = 95
+            self.clean_up()
         elif status == "Plone must restart the machine":
             if self.auto_restart.get():
                 self.restart_computer()
