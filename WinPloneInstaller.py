@@ -188,7 +188,7 @@ class WindowsPloneInstaller:
             self.update_bash_script()
             self.run_PS("enable_wsl.ps1")
 
-    def update_bash_script():
+    def update_bash_script(self):
         install_call = "sudo ./install.sh"
 
         if self.default_password.get():

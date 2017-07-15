@@ -2,10 +2,11 @@ Please see the github repo for documentation! It is in the wiki (https://github.
 (a copy of the reStructuredText is also included in the /docs folder)
 
 Steps for creating installer EXE with PyInstaller
-	Get python (currently building on 3.5)
+	Get python (currently building on 3.5.2)
 	Make sure pip is installed and accessible from powershell
 	Run "pip install pyinstaller"
 	Be sure python-tk package is installed for GUI (hit and miss for me whether I had to do this manually)
+	run "pip install pillow"
 	http://pywin32.sourceforge.net/ may need to be added manually (especially when building on older versions of Windows)
 	Run build.ps1 in powershell
 
