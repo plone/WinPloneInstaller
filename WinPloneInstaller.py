@@ -20,17 +20,18 @@ class WindowsPloneInstaller:
         self.plone_key = r'SOFTWARE\PloneInstaller' #our Windows registry key under HKEY_CURRENT_USER
         #self.run_once_key = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
 
-        self.installer_path = os.path.realpath(__file__).split(".")[0]+".exe"
-        self.log_path = os.path.dirname(self.installer_path) + "\install.log"
-
         try: #Grab installation state from registry if it exists
             self.reg_key = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
             self.install_status = QueryValueEx(self.reg_key, "install_status")[0]
+            self.installer_path = QueryValueEx(self.reg_key, "installer_path")[0]
+            self.log_path = QueryValueEx(self.reg_key, "log_path")[0]
 
         except: #Otherwise create it with ititial "begin" value
             self.reg_key = CreateKey(HKEY_CURRENT_USER, self.plone_key)
             self.install_status = "begin"
             SetValueEx(self.reg_key, "install_status", 1, REG_SZ, self.install_status)
+            self.installer_path = os.path.realpath(__file__).split(".")[0]+".exe"
+            self.log_path = os.path.dirname(self.installer_path) + "\install.log"
 
         SetValueEx(self.reg_key, "base_path", 1, REG_SZ, self.base_path) #This ensures powershell and bash can find this path.
         SetValueEx(self.reg_key, "installer_path", 1, REG_SZ, self.installer_path)
@@ -179,11 +180,24 @@ class WindowsPloneInstaller:
         self.log("Installation Complete")
         self.clean_up()
             
+    def install_wsl(self):
+        self.run_PS("install_wsl.ps1", pipe=False, hide=False)
+        self.install_status = QueryValueEx(self.reg_key, "install_status")[0]
+        if self.install_status == "wsl_installed":
+            self.progress["value"] = 35
+            self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
+            self.log("Plone Installed Successfully")
+            self.progress["value"] = 95
+            self.clean_up()
+        else:
+            self.log("There was a problem enabling/installing WSL!")
+            self.kill_app()
+
     def install_plone_wsl(self):
         if self.install_status == "enabling_wsl":
             self.okaybutton.configure(state="disabled")
             self.log("Picking up where we left off. Installing Linux Subsystem...")
-            self.run_PS("install_wsl.ps1")
+            self.install_wsl()
         else:
             self.update_bash_script()
             self.run_PS("enable_wsl.ps1")
@@ -255,21 +269,24 @@ class WindowsPloneInstaller:
     def PS_status_handler(self, status):
         if status == "Installing WSL":
             self.log('Linux Subsystem is enabled')
-            self.progress["value"] = 20
-            self.run_PS("install_wsl.ps1", pipe=False, hide=False)
+            self.progress["value"] = 15
+            self.install_wsl()
         elif status == "Installing Plone on WSL":
             self.progress["value"] = 35
             self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
-            self.log("Plone Intstalled Successfully")
+            self.log("Plone Installed Successfully")
             self.progress["value"] = 95
             self.clean_up()
-        elif status == "Plone must restart the machine":
+        elif status == "Enabling WSL":
+            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux"])
+            ps_process.wait()
+            self.progress["value"] = 15
             if self.auto_restart.get():
                 self.restart_computer()
             else:
                 self.install_status = "enabling_wsl"
                 self.okaybutton.configure(state="enabled")
-                log("Please press Okay when you're ready!")
+                self.log("Please press Okay when you're ready to restart!")
         elif status == "Plone Installed Succesffully":
             self.progress["value"] = 95
             self.clean_up()
