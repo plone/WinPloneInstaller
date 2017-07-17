@@ -9,3 +9,6 @@ $newProcess = new-object System.Diagnostics.ProcessStartInfo $installerPath;
 $newProcess.Verb = "runas"; # Indicate that the process should be elevated
 
 [System.Diagnostics.Process]::Start($newProcess); # Start the new process
+Clear-Host
+Write-Host "Preparing the Plone installer, an interface will appear."
+Start-Sleep -s 3

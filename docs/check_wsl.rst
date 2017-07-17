@@ -1,4 +1,4 @@
-enable_wsl.ps1
+check_wsl.ps1
 =============
 
 This is the first PowerShell script the installer will run on machines which will utilize `WSL <https://github.com/lucid-0/WinPloneInstaller/wiki/WSL>`_.

@@ -64,6 +64,12 @@ Call install_plone_buildout() or install_plone_wsl() accordingly.
 install_plone_buildout()
 ------------------------
 
+check_wsl()
+-----------
+
+enable_wsl()
+------------
+
 install_wsl()
 -------------
 

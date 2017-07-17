@@ -40,7 +40,8 @@ class WindowsPloneInstaller:
         if self.install_status == "begin":
             self.install_status = "elevated"
             SetValueEx(self.reg_key, "install_status", 1, REG_SZ, self.install_status)
-            self.run_PS("elevate.ps1", pipe=False)
+            self.run_PS("elevate.ps1", pipe=False, hide=False)
+            CloseKey(self.reg_key)
             self.kill_app()
 
         self.required_build = 15063
@@ -56,7 +57,7 @@ class WindowsPloneInstaller:
         self.gui = Tk()
         self.gui.title("Windows Plone Installer")
         window_width = 500
-        window_height = 325
+        window_height = 330
         self.fr1 = Frame(self.gui, width=window_width, height=window_height)
         self.fr1.pack(side="top")
 
@@ -96,7 +97,7 @@ class WindowsPloneInstaller:
         button_frame = Frame(self.fr1)
 
         load_logo = Image.open(self.base_path + '\\resources\\plone.png')
-        logo = ImageTk.PhotoImage(load_logo.resize((45, 45), Image.ANTIALIAS))
+        logo = ImageTk.PhotoImage(load_logo.resize((40, 40), Image.ANTIALIAS))
         img = Label(button_frame, image=logo)
         img.grid(row=0, column=0, sticky="E")
 
@@ -119,16 +120,21 @@ class WindowsPloneInstaller:
             self.log("No previous installation config found.", display=False)
 
         if self.install_status == "enabling_wsl":
-            self.install_plone_wsl()
+            self.install_wsl()
+
+        self.log("This system has Windows build number " + str(self.build_number))
 
         if self.build_number < self.required_build:
-            self.log("This system has Windows build number " + str(self.build_number))
             self.log("Windows 10 with Creator's Update (build 15063) required to install on WSL (recommended)")
-            self.log("Will install Plone with buildout, configure and select Okay")
+            self.log("Will install Plone with buildout")
             default_pass_button.grid_forget() #default password is always used for buildout version
             self.auto_restart_checkbutton.grid_forget() #No restart necessary for buildout version
             window_height = 290
             self.fr1.config(height=window_height)
+        else:
+            self.log("Plone can be installed on WSL on this machine (recommended)")
+
+        self.log("Configure and select Okay.")
 
         #GUI Settings
         ws = self.gui.winfo_screenwidth()
@@ -154,7 +160,7 @@ class WindowsPloneInstaller:
         if self.build_number < self.required_build:
             self.install_plone_buildout()
         else:
-            self.install_plone_wsl()
+            self.check_wsl()
 
     def install_plone_buildout(self):
         if self.default_directory.get():
@@ -180,27 +186,41 @@ class WindowsPloneInstaller:
         self.log("Installation Complete")
         self.clean_up()
             
-    def install_wsl(self):
-        self.run_PS("install_wsl.ps1", pipe=False, hide=False)
-        self.install_status = QueryValueEx(self.reg_key, "install_status")[0]
-        if self.install_status == "wsl_installed":
-            self.progress["value"] = 35
-            self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
-            self.log("Plone Installed Successfully")
-            self.progress["value"] = 95
-            self.clean_up()
-        else:
-            self.log("There was a problem enabling/installing WSL!")
-            self.kill_app()
-
-    def install_plone_wsl(self):
+    def check_wsl(self):
         if self.install_status == "enabling_wsl":
             self.okaybutton.configure(state="disabled")
             self.log("Picking up where we left off. Installing Linux Subsystem...")
             self.install_wsl()
         else:
-            self.update_bash_script()
-            self.run_PS("enable_wsl.ps1")
+            self.run_PS("check_wsl.ps1") #PS_status_handler will end up taking care of next steps
+
+    def enable_wsl(self):
+        ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux"])
+        ps_process.wait()
+        self.progress["value"] = 15
+        if self.auto_restart.get():
+            self.restart_computer()
+        else:
+            self.install_status = "enabling_wsl"
+            self.okaybutton.configure(state="enabled")
+            self.log("Please press Okay when you're ready to restart!")
+
+    def install_wsl(self):
+        self.run_PS("install_wsl.ps1", pipe=False, hide=False)
+        self.install_status = QueryValueEx(self.reg_key, "install_status")[0]
+        if self.install_status == "wsl_installed":
+            self.install_plone_wsl()
+        else:
+            self.log("There was a problem enabling/installing WSL!")
+            self.kill_app()
+
+    def install_plone_wsl(self):
+        self.progress["value"] = 35
+        self.update_bash_script()
+        self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
+        self.log("Plone Installed Successfully")
+        self.progress["value"] = 95
+        self.clean_up()
 
     def update_bash_script(self):
         install_call = "sudo ./install.sh"
@@ -262,31 +282,21 @@ class WindowsPloneInstaller:
         else: #This will have to change if there's ever a reason for pipe=True & hide=False (doubtful)
             self.log("Please follow PowerShell prompts to continue. Calling " + script_name + " in Microsoft PowerShell.")
             ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Unrestricted", ". " + script_path])
-            self.gui.withdraw() #We'll close our window and focus on PowerShell
+            if script_name != "elevate.ps1": #quick fix for now, gui doesn't exist yet when elevate is called.
+                self.gui.withdraw() #We'll close our window and focus on PowerShell
             ps_process.wait()
-            self.gui.deiconify()
+            if script_name != "elevate.ps1": #quick fix for now, gui doesn't exist yet when elevate is called.
+                self.gui.deiconify()
 
     def PS_status_handler(self, status):
-        if status == "Installing WSL":
+        if status == "Enabling WSL":
+            self.enable_wsl()
+        elif status == "Installing WSL":
             self.log('Linux Subsystem is enabled')
             self.progress["value"] = 15
             self.install_wsl()
         elif status == "Installing Plone on WSL":
-            self.progress["value"] = 35
-            self.run_PS("install_plone_wsl.ps1", pipe=False, hide=False) #Install Plone on the new instance of WSL
-            self.log("Plone Installed Successfully")
-            self.progress["value"] = 95
-            self.clean_up()
-        elif status == "Enabling WSL":
-            ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux"])
-            ps_process.wait()
-            self.progress["value"] = 15
-            if self.auto_restart.get():
-                self.restart_computer()
-            else:
-                self.install_status = "enabling_wsl"
-                self.okaybutton.configure(state="enabled")
-                self.log("Please press Okay when you're ready to restart!")
+            self.install_plone_wsl()
         elif status == "Plone Installed Succesffully":
             self.progress["value"] = 95
             self.clean_up()
@@ -295,11 +305,14 @@ class WindowsPloneInstaller:
         with open(self.log_path, "a") as log:
             log.write(message+"\n")
         if display:
-            self.log_text.config(state="normal")
-            self.log_text.insert(END, "> " + message + '\n')
-            self.log_text.config(state="disabled")
-            self.log_text.see(END)
-            self.gui.update()
+            try:
+                self.log_text.config(state="normal")
+                self.log_text.insert(END, "> " + message + '\n')
+                self.log_text.config(state="disabled")
+                self.log_text.see(END)
+                self.gui.update()
+            except:
+                print("Tried to log before text object exists.")
 
     def restart_computer(self):
         self.log("Installation should continue after the machine restarts, thank you.")
@@ -312,10 +325,10 @@ class WindowsPloneInstaller:
             if self.build_number >= self.required_build:
                 start_script.write('\nbash -c "sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl start"') #this line will start plone in WSL
             else:
-                start_script.write('\nC:\bin\instance fg')
+                start_script.write('\n'+self.intall_directory+'bin\instance console')
 
             start_script.close()
-        self.run_PS("start_plone.ps1", pipe=False, hide=False)
+        sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". "+self.base_path+"\\PS\\start_plone.ps1"])
 
     def clean_up(self):
         self.log('Cleaning up.')
