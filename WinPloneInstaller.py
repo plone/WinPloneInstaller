@@ -25,6 +25,7 @@ class WindowsPloneInstaller:
             self.install_status = QueryValueEx(self.reg_key, "install_status")[0]
             self.installer_path = QueryValueEx(self.reg_key, "installer_path")[0]
             self.log_path = QueryValueEx(self.reg_key, "log_path")[0]
+            #self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0]) wanted to not call get_build_number when returning from reboot but at this point build_number hasnt been placed in registry
 
         except: #Otherwise create it with ititial "begin" value
             self.reg_key = CreateKey(HKEY_CURRENT_USER, self.plone_key)
@@ -43,9 +44,9 @@ class WindowsPloneInstaller:
             self.run_PS("elevate.ps1", pipe=False, hide=False)
             CloseKey(self.reg_key)
             self.kill_app()
-
-        self.required_build = 15063
-        self.get_build_number()
+        elif self.install_status == "elevated":
+            self.required_build = 15063
+            self.get_build_number()
 
         self.init_GUI()
 

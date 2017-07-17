@@ -1,7 +1,7 @@
 echo "Please enter your Linux Subsystem password to allow WinPloneInstaller to continue."
 sudo echo "Updating/Upgrading WSL"
-sudo apt-get -y update
-sudo apt-get -y upgrade
+sudo yes | apt-get update
+sudo yes | apt-get upgrade
 echo "Installing dependencies on WSL"
 sudo apt-get -y install python-setuptools python-dev build-essential libssl-dev libxml2-dev libxslt1-dev libbz2-dev libjpeg62-dev
 sudo apt-get -y install libreadline-dev wv poppler-utils
