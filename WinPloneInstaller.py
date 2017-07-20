@@ -18,7 +18,8 @@ class WindowsPloneInstaller:
             self.base_path = os.path.abspath(".")
 
         self.plone_key = r'SOFTWARE\PloneInstaller' #our Windows registry key under HKEY_CURRENT_USER
-        #self.run_once_key = r'Software\Microsoft\Windows\CurrentVersion\RunOnce'
+
+        self.required_build = 15063 #this build number required for WSL installation
 
         try: #Grab installation state from registry if it exists
             self.reg_key = OpenKey(HKEY_CURRENT_USER, self.plone_key, 0, KEY_ALL_ACCESS)
@@ -44,7 +45,6 @@ class WindowsPloneInstaller:
             CloseKey(self.reg_key)
             self.kill_app()
         elif self.install_status == "elevated":
-            self.required_build = 15063
             self.get_build_number()
         elif self.install_status == "enabling_plone":
             self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0])
@@ -292,6 +292,7 @@ class WindowsPloneInstaller:
 
     def PS_status_handler(self, status):
         if status == "Enabling WSL":
+            self.progress["value"] = 5
             self.enable_wsl()
         elif status == "Installing WSL":
             self.log('Linux Subsystem is enabled')
@@ -322,32 +323,36 @@ class WindowsPloneInstaller:
         time.sleep(3)
         ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
 
+    def clean_up(self):
+        self.log('Cleaning up.')
+        self.progress["value"] = 100
+        self.log("Thank you! The installer will close.")
+
+        try:
+            if self.start_plone.get():
+                self.run_plone()
+            self.log("debug: past run_plone() call")
+            time.sleep(5) #let user see end of log and start_plone.ps1 grab location from registry before cleaning it.
+
+            CloseKey(self.reg_key)
+            DeleteKey(HKEY_CURRENT_USER, self.plone_key)
+
+            self.kill_app()
+        except Exception as e:
+            self.log(str(e))
+            self.log(e.message)
+
     def run_plone(self):
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
             if self.build_number >= self.required_build:
                 start_script.write('\nSet-Location $path+"\\bash"')
-                start_script.write('\nbash -c "./start.sh"') #this line will start plone in WSL
+                start_script.write('\nStart-Process -FilePath "bash" -ArgumentList (\'-c "./start.sh"\')') #this line will start plone in WSL
             else:
                 start_script.write('\n'+self.install_directory+'\\Plone\\bin\\instance console')
 
             start_script.close()
 
         sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". "+self.base_path+"\\PS\\start_plone.ps1"])
-
-    def clean_up(self):
-        self.log('Cleaning up.')
-        self.progress["value"] = 100
-        self.log("Thank you! The installer will close.")
-
-        if self.start_plone.get():
-            self.run_plone()
-
-        time.sleep(5) #let user see end of log and start_plone.ps1 grab location from registry before cleaning it.
-
-        CloseKey(self.reg_key)
-        DeleteKey(HKEY_CURRENT_USER, self.plone_key)
-
-        self.kill_app()
 
     def kill_app(self):
         sys.exit(0)
