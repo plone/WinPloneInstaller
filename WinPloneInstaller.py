@@ -46,7 +46,7 @@ class WindowsPloneInstaller:
         elif self.install_status == "elevated":
             self.required_build = 15063
             self.get_build_number()
-        elif self.install_status = "enabling_plone":
+        elif self.install_status == "enabling_plone":
             self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0])
 
         self.init_GUI()
