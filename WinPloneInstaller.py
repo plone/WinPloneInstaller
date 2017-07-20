@@ -25,7 +25,6 @@ class WindowsPloneInstaller:
             self.install_status = QueryValueEx(self.reg_key, "install_status")[0]
             self.installer_path = QueryValueEx(self.reg_key, "installer_path")[0]
             self.log_path = QueryValueEx(self.reg_key, "log_path")[0]
-            #self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0]) wanted to not call get_build_number when returning from reboot but at this point build_number hasnt been placed in registry
 
         except: #Otherwise create it with ititial "begin" value
             self.reg_key = CreateKey(HKEY_CURRENT_USER, self.plone_key)
@@ -47,6 +46,8 @@ class WindowsPloneInstaller:
         elif self.install_status == "elevated":
             self.required_build = 15063
             self.get_build_number()
+        elif self.install_status = "enabling_plone":
+            self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0])
 
         self.init_GUI()
 
@@ -166,16 +167,16 @@ class WindowsPloneInstaller:
     def install_plone_buildout(self):
         if self.default_directory.get():
             self.log("Will install to C:\Plone")
-            install_directory = "C:\\"
+            self.install_directory = "C:\\"
         else:
-            install_directory = ''
+            self.install_directory = ''
             self.log("A dialog will appear. A \Plone directory will be added to the one you choose.")
             time.sleep(4)
 
-            while install_directory == '': #make sure user selects a valid directory
-                install_directory = filedialog.askdirectory()
+            while self.install_directory == '': #make sure user selects a valid directory
+                self.install_directory = filedialog.askdirectory()
 
-        SetValueEx(self.reg_key, "install_directory", 1, REG_SZ, install_directory)
+        SetValueEx(self.reg_key, "install_directory", 1, REG_SZ, self.install_directory)
 
         self.progress["value"] = 5 #Don't want them to worry while Chocolatey installs :)
         self.log("Installing Chocolatey package manager...")
@@ -324,22 +325,27 @@ class WindowsPloneInstaller:
     def run_plone(self):
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
             if self.build_number >= self.required_build:
-                start_script.write('\nbash -c "sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl start"') #this line will start plone in WSL
+                start_script.write('\nSet-Location $path+"\\bash"')
+                start_script.write('\nbash -c "./start.sh"') #this line will start plone in WSL
             else:
-                start_script.write('\n'+self.intall_directory+'bin\instance console')
+                start_script.write('\n'+self.install_directory+'\\Plone\\bin\\instance console')
 
             start_script.close()
+
         sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". "+self.base_path+"\\PS\\start_plone.ps1"])
 
     def clean_up(self):
         self.log('Cleaning up.')
-        CloseKey(self.reg_key)
-        DeleteKey(HKEY_CURRENT_USER, self.plone_key)
         self.progress["value"] = 100
         self.log("Thank you! The installer will close.")
-        time.sleep(5)
+
         if self.start_plone.get():
             self.run_plone()
+
+        time.sleep(5) #let user see end of log and start_plone.ps1 grab location from registry before cleaning it.
+
+        CloseKey(self.reg_key)
+        DeleteKey(HKEY_CURRENT_USER, self.plone_key)
 
         self.kill_app()
 

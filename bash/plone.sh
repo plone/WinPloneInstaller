@@ -1,4 +1,4 @@
-echo "Please enter your Linux Subsystem password to allow WinPloneInstaller to continue."
+echo "Please enter your Linux Subsystem password to allow the Plone installer to continue."
 sudo echo "Updating/Upgrading WSL"
 sudo yes | apt-get update
 sudo yes | apt-get upgrade
