@@ -320,7 +320,6 @@ class WindowsPloneInstaller:
                 self.gui.update()
             except Exception as e:
                 print("Tried to log before text object exists.")
-                self.log(str(e))
 
     def restart_computer(self):
         self.log("Installation should continue after the machine restarts, thank you.")
@@ -336,7 +335,7 @@ class WindowsPloneInstaller:
         try:
             if self.start_plone.get():
                 self.run_plone()
-            self.log("debug: past run_plone() call")
+
             time.sleep(5) #let user see end of log and start_plone.ps1 grab location from registry before cleaning it.
 
             CloseKey(self.reg_key)
@@ -347,6 +346,7 @@ class WindowsPloneInstaller:
             self.log(str(e))
 
     def run_plone(self):
+        self.log("When the installer finishes, see localhost:8080 in your browser to see Plone in action.")
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
             if self.build_number >= self.required_build:
                 start_script.write('\nSet-Location $path+"\\bash"')
