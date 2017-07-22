@@ -12,10 +12,14 @@ from PIL import Image, ImageTk
 class WindowsPloneInstaller:
 
     def __init__(self):
+
         try:
             self.base_path = sys._MEIPASS  # PyInstaller creates a temp folder and stores path in _MEIPASS environment variable
         except Exception:
             self.base_path = os.path.abspath(".")
+
+        #sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe",". "+self.base_path+"\\bash\\test.ps1"])
+        #self.kill_app()
 
         self.plone_key = r'SOFTWARE\PloneInstaller' #our Windows registry key under HKEY_CURRENT_USER
 
@@ -235,7 +239,7 @@ class WindowsPloneInstaller:
 
         install_call += " standalone"
 
-        with io.open(self.base_path + "\\bash\\plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
+        with io.open(self.base_path + "\\bash\\install_plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
             bash_script.write("\n"+install_call)
 
             bash_script.close()
@@ -314,8 +318,9 @@ class WindowsPloneInstaller:
                 self.log_text.config(state="disabled")
                 self.log_text.see(END)
                 self.gui.update()
-            except:
+            except Exception as e:
                 print("Tried to log before text object exists.")
+                self.log(str(e))
 
     def restart_computer(self):
         self.log("Installation should continue after the machine restarts, thank you.")
@@ -340,13 +345,12 @@ class WindowsPloneInstaller:
             self.kill_app()
         except Exception as e:
             self.log(str(e))
-            self.log(e.message)
 
     def run_plone(self):
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
             if self.build_number >= self.required_build:
                 start_script.write('\nSet-Location $path+"\\bash"')
-                start_script.write('\nStart-Process -FilePath "bash" -ArgumentList (\'-c "./start.sh"\')') #this line will start plone in WSL
+                start_script.write('\nbash -c "./launch.sh start_plone"') #this line will start plone in WSL
             else:
                 start_script.write('\n'+self.install_directory+'\\Plone\\bin\\instance console')
 

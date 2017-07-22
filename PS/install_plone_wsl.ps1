@@ -5,6 +5,6 @@ Set-Location $plonePath
 . ".\PS\log.ps1"
 Set-Location bash
 log("Calling WinPloneInstaller bash script")
-bash -c "./launch.sh"
+bash -c "./launch.sh install_plone"
 Write-Host -NoNewLine "Press any key and the Plone installer will clean up and finish."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
