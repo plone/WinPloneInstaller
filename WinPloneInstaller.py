@@ -50,7 +50,7 @@ class WindowsPloneInstaller:
             self.kill_app()
         elif self.install_status == "elevated":
             self.get_build_number()
-        elif self.install_status == "enabling_plone":
+        elif self.install_status == "enabling_wsl":
             self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0])
 
         self.init_GUI()
@@ -119,6 +119,7 @@ class WindowsPloneInstaller:
         button_frame.grid(row=6)
 
         self.log("Welcome to Plone Installer for Windows.")
+        self.log("This log can be found in the install.log file in the installer directory.")
 
         try:
             self.get_reg_vars()
@@ -349,7 +350,7 @@ class WindowsPloneInstaller:
         self.log("When the installer finishes, see localhost:8080 in your browser to see Plone in action.")
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
             if self.build_number >= self.required_build:
-                start_script.write('\nSet-Location $path+"\\bash"')
+                start_script.write('\nSet-Location bash')
                 start_script.write('\nStart-Process -FilePath "bash" -ArgumentList ("-c",  "./launch.sh\\ start_plone")') #this line will start plone in WSL
                 self.log("To start Plone manually later, use 'sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl fg' in Bash.")
             else:
