@@ -4,7 +4,9 @@ $plonePath = (Get-ItemProperty -Path $ploneKey -Name base_path).base_path
 Set-Location $plonePath
 . ".\PS\log.ps1"
 Set-Location bash
-log("Calling WinPloneInstaller bash script")
-bash -c "./launch.sh install_plone"
+log("Calling Plone installation script in Bash")
+#bash -c "./launch.sh install_plone"
+$bash = $(Start-Process -FilePath "bash" -ArgumentList ("-c","./launch.sh\ install_plone") -PassThru);
+$bash | Wait-Process;
 Write-Host -NoNewLine "Press any key and the Plone installer will clean up and finish."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

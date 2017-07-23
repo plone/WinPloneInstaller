@@ -350,9 +350,11 @@ class WindowsPloneInstaller:
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
             if self.build_number >= self.required_build:
                 start_script.write('\nSet-Location $path+"\\bash"')
-                start_script.write('\nbash -c "./launch.sh start_plone"') #this line will start plone in WSL
+                start_script.write('\nStart-Process -FilePath "bash" -ArgumentList ("-c",  "./launch.sh\\ start_plone")') #this line will start plone in WSL
+                self.log("To start Plone manually later, use 'sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl fg' in Bash.")
             else:
                 start_script.write('\n'+self.install_directory+'\\Plone\\bin\\instance console')
+                self.log("To start Plone manually later, use '"+self.install_directory+"\Plone\bin\instance console' in PowerShell.")
 
             start_script.close()
 
