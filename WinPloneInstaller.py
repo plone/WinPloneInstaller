@@ -18,9 +18,6 @@ class WindowsPloneInstaller:
         except Exception:
             self.base_path = os.path.abspath(".")
 
-        #sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe",". "+self.base_path+"\\bash\\test.ps1"])
-        #self.kill_app()
-
         self.plone_key = r'SOFTWARE\PloneInstaller' #our Windows registry key under HKEY_CURRENT_USER
 
         self.required_build = 15063 #this build number required for WSL installation
@@ -156,6 +153,7 @@ class WindowsPloneInstaller:
         self.okaybutton.configure(state="disabled")
         self.set_reg_vars()
         if self.install_status == "elevated":
+            self.check_connection()
             self.init_install()
         elif self.install_status == "enabling_wsl":
             self.restart_computer()
@@ -168,6 +166,28 @@ class WindowsPloneInstaller:
             self.install_plone_buildout()
         else:
             self.check_wsl()
+
+    def check_connection(self):
+        connection_trouble = 1
+        attempts = 0
+        self.log("Checking for internet connection")
+        while connection_trouble == 1:
+            connection_trouble = os.system("ping -n 1 plone.org") #successful ping with return 0
+            attempts += 1
+            if attempts == 1:
+                if connection_trouble == 1:
+                    self.log("First attempt at connecting has failed. Will keep trying for a minute, please check connection.")
+                else:
+                    break
+            if attempts == 60:
+                self.log("An internet connection has not been made.")
+                self.log("Please reopen the installer to retry later. Thank you!")
+                time.sleep(4)
+                self.kill_app()
+            time.sleep(2)
+        self.log("Connection established.")
+        return
+
 
     def install_plone_buildout(self):
         if self.default_directory.get():
@@ -197,6 +217,7 @@ class WindowsPloneInstaller:
         if self.install_status == "enabling_wsl":
             self.okaybutton.configure(state="disabled")
             self.log("Picking up where we left off. Installing Linux Subsystem...")
+            self.check_connection()
             self.install_wsl()
         else:
             self.run_PS("check_wsl.ps1") #PS_status_handler will end up taking care of next steps
