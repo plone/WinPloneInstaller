@@ -56,6 +56,12 @@ cancel_handler(event)
 The cancel button is bound to this function.
 See kill_app()
 
+check_connection()
+------------------
+Ping http://plone.org to ensure internet connection.
+Alert the user and keep trying for up to 2 minutes if there is no connection.
+End program after a "try again later" message if connection cannot be established.
+
 init_install()
 --------------
 Compare machine build number to the required build number.
@@ -63,12 +69,22 @@ Call install_plone_buildout() or install_plone_wsl() accordingly.
 
 install_plone_buildout()
 ------------------------
+If the user has chosen to select a custom installation directory, display the prompt for this selection now.
+Place text the selection (or the default directory) in the registry for PowerShell to recover.
+Call install_choco.ps1 in PowerShell.
+Call install_plone_build.ps1 in PowerShell.
+Call clean_up() once Plone is installed.
 
 check_wsl()
 -----------
+This is the first function called on a machine which will install Plone on WSL.
+Calls check_wsl.ps1 in PowerShell unless this has already been done, in which case WSL has just been enabled and we can call install_wsl()
 
 enable_wsl()
 ------------
+Runs one line of PowerShell code via the subprocess module's Popen interface.
+This line enables WSL on Windows 10.
+enable_wsl() also handles the user's checkbox selection to restart automatically or be prompted first.
 
 install_wsl()
 -------------
@@ -107,6 +123,8 @@ log(message, display=True)
 
 restart_computer()
 ------------------
+Inform the user we are about to restart in the log text.
+Use "Restart-Computer" cmdlet in PowerShell via subprocess' Popen interface.
 
 run_plone()
 -----------

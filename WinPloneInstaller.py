@@ -354,29 +354,32 @@ class WindowsPloneInstaller:
         self.progress["value"] = 100
         self.log("Thank you! The installer will close.")
 
-        try:
-            if self.start_plone.get():
-                self.run_plone()
+        if self.start_plone.get():
+            self.log("When the installer finishes, see localhost:8080 in your browser to see Plone in action.")
 
-            time.sleep(5) #let user see end of log and start_plone.ps1 grab location from registry before cleaning it.
+        if self.build_number >= self.required_build:
+            self.log("To start Plone manually later, use 'sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl fg' in Bash.")
+        else:
+            self.log("To start Plone manually later, use '"+self.install_directory+"\Plone\bin\instance console' in PowerShell.")
 
-            CloseKey(self.reg_key)
-            DeleteKey(HKEY_CURRENT_USER, self.plone_key)
+        time.sleep(5) #let user see end of log and start_plone.ps1 grab location from registry before cleaning it.
 
-            self.kill_app()
-        except Exception as e:
-            self.log(str(e))
+        CloseKey(self.reg_key)
+        DeleteKey(HKEY_CURRENT_USER, self.plone_key)
+
+        if self.start_plone.get():
+            self.run_plone()
+
+        self.kill_app()
 
     def run_plone(self):
-        self.log("When the installer finishes, see localhost:8080 in your browser to see Plone in action.")
+        
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
             if self.build_number >= self.required_build:
                 start_script.write('\nSet-Location bash')
                 start_script.write('\nStart-Process -FilePath "bash" -ArgumentList ("-c",  "./launch.sh\\ start_plone")') #this line will start plone in WSL
-                self.log("To start Plone manually later, use 'sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl fg' in Bash.")
             else:
                 start_script.write('\n'+self.install_directory+'\\Plone\\bin\\instance console')
-                self.log("To start Plone manually later, use '"+self.install_directory+"\Plone\bin\instance console' in PowerShell.")
 
             start_script.close()
 
