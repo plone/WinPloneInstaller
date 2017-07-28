@@ -34,3 +34,5 @@ env\Scripts\pip install -r requirements.txt
 log("Starting buildout, this will take a while...")
 env\Scripts\buildout
 log("Plone Installed Successfully")
+Write-Host -NoNewLine "Press any key and the Plone installer will clean up and finish."
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

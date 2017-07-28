@@ -191,8 +191,7 @@ class WindowsPloneInstaller:
 
     def install_plone_buildout(self):
         if self.default_directory.get():
-            self.log("Will install to C:\Plone")
-            self.install_directory = "C:\\"
+            self.install_directory = "C:\\Program Files"
         else:
             self.install_directory = ''
             self.log("A dialog will appear. A \Plone directory will be added to the one you choose.")
@@ -201,6 +200,8 @@ class WindowsPloneInstaller:
             while self.install_directory == '': #make sure user selects a valid directory
                 self.install_directory = filedialog.askdirectory()
 
+        self.install_directory = self.install_directory.replace("/", "\\")
+        self.log("Will install to "+self.install_directory+"\\Plone")
         SetValueEx(self.reg_key, "install_directory", 1, REG_SZ, self.install_directory)
 
         self.progress["value"] = 5 #Don't want them to worry while Chocolatey installs :)
@@ -355,12 +356,12 @@ class WindowsPloneInstaller:
         self.log("Thank you! The installer will close.")
 
         if self.start_plone.get():
-            self.log("When the installer finishes, see localhost:8080 in your browser to see Plone in action.")
+            self.log("When the installer finishes, give Plone a minute to start then see localhost:8080 in your browser to see Plone in action.")
 
         if self.build_number >= self.required_build:
             self.log("To start Plone manually later, use 'sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl fg' in Bash.")
         else:
-            self.log("To start Plone manually later, use '"+self.install_directory+"\Plone\bin\instance console' in PowerShell.")
+            self.log("To start Plone manually later, use '"+self.install_directory+"\Plone\\bin\\instance fg' in PowerShell.")
 
         time.sleep(5) #let user see end of log and start_plone.ps1 grab location from registry before cleaning it.
 
@@ -373,14 +374,14 @@ class WindowsPloneInstaller:
         self.kill_app()
 
     def run_plone(self):
-        
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
             if self.build_number >= self.required_build:
                 start_script.write('\nSet-Location bash')
                 start_script.write('\nStart-Process -FilePath "bash" -ArgumentList ("-c",  "./launch.sh\\ start_plone")') #this line will start plone in WSL
             else:
-                start_script.write('\n'+self.install_directory+'\\Plone\\bin\\instance console')
-
+                self.install_directory = self.install_directory.replace(" ","` ") #backtick escapes any space characters in the installation path in PowerShell
+                start_script.write("\nStart-Process -FilePath 'powershell' -ArgumentList ('"+self.install_directory+"\\Plone\\bin\\instance fg')")
+    
             start_script.close()
 
         sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". "+self.base_path+"\\PS\\start_plone.ps1"])
