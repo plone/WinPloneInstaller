@@ -157,6 +157,10 @@ class WindowsPloneInstaller:
             self.init_install()
         elif self.install_status == "enabling_wsl":
             self.restart_computer()
+        elif self.install_status == "complete":
+            if self.start_plone.get():
+                self.run_plone()
+            self.kill_app()
 
     def cancel_handler(self, event):
         self.kill_app()
@@ -347,13 +351,15 @@ class WindowsPloneInstaller:
     def restart_computer(self):
         self.log("Installation should continue after the machine restarts, thank you.")
         CloseKey(self.reg_key)
-        time.sleep(3)
+        time.sleep(10)
         ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
 
     def clean_up(self):
         self.log('Cleaning up.')
         self.progress["value"] = 100
-        self.log("Thank you! The installer will close.")
+        self.log("Thank you! Press Finish to end the installer.")
+
+        self.okaybutton.configure(state="enabled", text="Finish")
 
         if self.start_plone.get():
             self.log("When the installer finishes, give Plone a minute to start then see localhost:8080 in your browser to see Plone in action.")
@@ -363,15 +369,8 @@ class WindowsPloneInstaller:
         else:
             self.log("To start Plone manually later, use '"+self.install_directory+"\Plone\\bin\\instance fg' in PowerShell.")
 
-        time.sleep(5) #let user see end of log and start_plone.ps1 grab location from registry before cleaning it.
-
         CloseKey(self.reg_key)
         DeleteKey(HKEY_CURRENT_USER, self.plone_key)
-
-        if self.start_plone.get():
-            self.run_plone()
-
-        self.kill_app()
 
     def run_plone(self):
         with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
