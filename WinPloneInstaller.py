@@ -8,6 +8,7 @@ from tkinter import *
 from tkinter.ttk import *
 import tkinter.filedialog as filedialog
 from PIL import Image, ImageTk
+import winsound
 
 class WindowsPloneInstaller:
 
@@ -39,6 +40,8 @@ class WindowsPloneInstaller:
         SetValueEx(self.reg_key, "installer_path", 1, REG_SZ, self.installer_path)
         SetValueEx(self.reg_key, "log_path", 1, REG_SZ, self.log_path)
 
+        self.play_sound("loading.wav")
+
         if self.install_status == "begin":
             self.install_status = "elevated"
             SetValueEx(self.reg_key, "install_status", 1, REG_SZ, self.install_status)
@@ -55,6 +58,9 @@ class WindowsPloneInstaller:
     def get_build_number(self):
         self.run_PS("get_build_number.ps1", pipe=False)
         self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0])
+
+    def play_sound(self, sound_name):
+        winsound.PlaySound(self.base_path+"\\resources\\"+sound_name, winsound.SND_FILENAME)
 
     def init_GUI(self):
         self.gui = Tk()
@@ -153,6 +159,7 @@ class WindowsPloneInstaller:
         self.okaybutton.configure(state="disabled")
         self.set_reg_vars()
         if self.install_status == "elevated":
+            self.play_sound("begin.wav")
             self.check_connection()
             self.init_install()
         elif self.install_status == "enabling_wsl":
@@ -231,6 +238,7 @@ class WindowsPloneInstaller:
         ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Microsoft-Windows-Subsystem-Linux"])
         ps_process.wait()
         self.progress["value"] = 15
+        self.play_sound("attention.wav")
         if self.auto_restart.get():
             self.restart_computer()
         else:
@@ -357,6 +365,7 @@ class WindowsPloneInstaller:
     def clean_up(self):
         self.log('Cleaning up.')
         self.progress["value"] = 100
+        self.play_sound("complete.wav")
         self.log("Thank you! Press Finish to end the installer.")
         self.install_status = "complete"
         self.okaybutton.configure(state="enabled", text="Finish")
