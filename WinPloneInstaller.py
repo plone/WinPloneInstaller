@@ -358,7 +358,7 @@ class WindowsPloneInstaller:
         self.log('Cleaning up.')
         self.progress["value"] = 100
         self.log("Thank you! Press Finish to end the installer.")
-
+        self.install_status = "complete"
         self.okaybutton.configure(state="enabled", text="Finish")
 
         if self.start_plone.get():
