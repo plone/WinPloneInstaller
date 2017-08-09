@@ -94,6 +94,7 @@ install_plone_wsl()
 
 update_bash_script()
 --------------------
+Add a line to the bash script which installs Plone in order to pass on the user's configuration to the call to the unified installer's install.sh
 
 set_reg_vars()
 --------------
@@ -120,17 +121,23 @@ For example "*!Installing WSL" appears in enable_wsl.ps1 when PowerShell determi
 
 log(message, display=True)
 --------------------------
+The value of message variable will be saved to the install.log file in the installer's directory regardless. If display is True, it is also shown to the user in the log_text area.
 
 restart_computer()
 ------------------
 Inform the user we are about to restart in the log text.
 Use "Restart-Computer" cmdlet in PowerShell via subprocess' Popen interface.
 
-run_plone()
------------
-
 clean_up()
 ----------
+Set the progress bar value to 100% and play a completion noise.
+Change the text of the Okay button to "Finish" and enable it. It will kill the app when clicked next.
+Log a message about how to start plone manually later, and create the desktop shortcut if requested by user.
+
+create_shortcut()
+-----------------
+Calls run_PS on the appropriate PowerShell script. Either create_shortcut_wsl.ps1 or create_shortcut_buildout.ps1
 
 kill_app()
 ----------
+Simply call sys.exit(0) and kill this app/process.

@@ -1,6 +1,0 @@
-Pause longer before restart and make it more apparent to user
-Create Shortcut to start/stop Plone rather than starting automatically
-Sound
-	import winsound
-	winsound.PlaySound('filename.wav', winsound.SND_FILENAME)
-Do not kill app at the end just let user press okay/finish.
