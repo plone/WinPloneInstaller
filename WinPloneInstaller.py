@@ -40,9 +40,8 @@ class WindowsPloneInstaller:
         SetValueEx(self.reg_key, "installer_path", 1, REG_SZ, self.installer_path)
         SetValueEx(self.reg_key, "log_path", 1, REG_SZ, self.log_path)
 
-        self.play_sound("loading.wav")
-
         if self.install_status == "begin":
+            self.play_sound("loading.wav")
             self.install_status = "elevated"
             SetValueEx(self.reg_key, "install_status", 1, REG_SZ, self.install_status)
             self.run_PS("elevate.ps1", pipe=False, hide=False)
@@ -146,7 +145,7 @@ class WindowsPloneInstaller:
             self.fr1.config(height=window_height)
         else:
             self.log("Plone can be installed on WSL on this machine (recommended)")
-            self.default_dir_button.grid_forget()
+            default_dir_button.grid_forget()
             window_height = 310
             self.fr1.config(height=window_height)
 
@@ -245,6 +244,7 @@ class WindowsPloneInstaller:
         ps_process.wait()
         self.progress["value"] = 15
         self.play_sound("attention.wav")
+        self.gui.focus_force()
         if self.auto_restart.get():
             self.restart_computer()
         else:
