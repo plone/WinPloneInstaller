@@ -281,7 +281,8 @@ class WindowsPloneInstaller:
 
         with io.open(self.base_path + "\\bash\\install_plone.sh", "a", newline='\n') as bash_script: #io.open allows explicit unix-style newline characters
             bash_script.write("\n"+install_call)
-
+            bash_script.write("\necho Press any key and the Plone installer will clean up and finish.")
+            bash_script.write("\nread -n 1 -s")
             bash_script.close()
 
     def set_reg_vars(self):
@@ -366,7 +367,7 @@ class WindowsPloneInstaller:
     def restart_computer(self):
         self.log("Installation should continue after the machine restarts, thank you.")
         CloseKey(self.reg_key)
-        time.sleep(10)
+        time.sleep(15)
         ps_process = sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", "Restart-Computer"])
 
     def clean_up(self):
@@ -384,7 +385,7 @@ class WindowsPloneInstaller:
             self.create_shortcut()
 
         if self.build_number >= self.required_build:
-            self.log("To start Plone manually later, use 'sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl fg' in Bash.")
+            self.log("To start Plone manually later, use 'sudo -u plone_daemon /etc/Plone/zinstance/bin/plonectl console' in Bash.")
         else:
             self.log("To start Plone manually later, use '"+self.install_directory+"\\Plone\\bin\\instance fg' in PowerShell.")
 
@@ -406,9 +407,10 @@ class WindowsPloneInstaller:
 
     def create_shortcut(self):
         if self.build_number >= self.required_build:
-            run_PS("create_shortcut_wsl.ps1", pipe=False)
+            self.run_PS("create_shortcut_wsl.ps1", pipe=False)
+            self.log("You'll need to remember your UNIX/WSL password when you use the Plone shortcut.")
         else:
-            run_PS("create_shortcut_buildout.ps1", pipe=False)
+            self.run_PS("create_shortcut_buildout.ps1", pipe=False)
         
         self.log("Plone Desktop shortcut created.")
 

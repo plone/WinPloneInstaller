@@ -4,7 +4,7 @@ Set-Location $path
 $shell = New-Object -comObject WScript.Shell
 $shortcut = $shell.CreateShortcut("$Home\Desktop\Plone.lnk")
 $target = "C:\Windows\System32\bash.exe"
-$arguments = "-c '/etc/Plone/zinstance/bin/plonectl console'"
+$arguments = "-c 'sudo /etc/Plone/zinstance/bin/plonectl console'"
 $shortcut.TargetPath = $target
 $shortcut.Arguments = $arguments
 $iconPath = "C:\Program` Files\plone.ico"

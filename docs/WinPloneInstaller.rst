@@ -88,9 +88,11 @@ enable_wsl() also handles the user's checkbox selection to restart automatically
 
 install_wsl()
 -------------
+Call install_wsl.ps1 in PowerShell, then call install_plone_wsl()
 
 install_plone_wsl()
 -------------------
+Call install_plone_wsl.ps1 in PowerShell, then call clean_up()
 
 update_bash_script()
 --------------------
