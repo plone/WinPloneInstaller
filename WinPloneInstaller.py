@@ -69,7 +69,6 @@ class WindowsPloneInstaller:
         self.fr1 = Frame(self.gui, width=window_width, height=window_height)
         self.fr1.pack(side="top")
 
-        #self.start_plone = IntVar(value=1)
         self.make_shortcut = IntVar(value=1)
         self.default_password = IntVar(value=1)
         self.default_directory = IntVar(value=1)
@@ -89,7 +88,6 @@ class WindowsPloneInstaller:
         self.progress.grid(row=1, sticky="EW")
 
         #GUI Row 2
-        #Checkbutton(self.fr1, text="Start Plone after installation", variable=self.start_plone).grid(row=2,sticky="EW")
         Checkbutton(self.fr1, text="Create Plone Desktop shortcut", variable=self.make_shortcut).grid(row=2,sticky="EW")
 
         #GUI Row 3
@@ -162,16 +160,14 @@ class WindowsPloneInstaller:
         
     def okay_handler(self, event):
         self.okaybutton.configure(state="disabled")
-        self.set_reg_vars()
         if self.install_status == "elevated":
             self.play_sound("begin.wav")
+            self.set_reg_vars()
             self.check_connection()
             self.init_install()
         elif self.install_status == "enabling_wsl":
             self.restart_computer()
         elif self.install_status == "complete":
-            #if self.start_plone.get():
-            #    self.run_plone()
             self.kill_app()
 
     def cancel_handler(self, event):
@@ -203,7 +199,6 @@ class WindowsPloneInstaller:
             time.sleep(2)
         self.log("Connection established.")
         return
-
 
     def install_plone_buildout(self):
         if self.default_directory.get():
@@ -286,14 +281,12 @@ class WindowsPloneInstaller:
             bash_script.close()
 
     def set_reg_vars(self):
-        #SetValueEx(self.reg_key, "start_plone", 1, REG_SZ, str(self.start_plone.get()))
         SetValueEx(self.reg_key, "make_shortcut", 1, REG_SZ, str(self.make_shortcut.get()))
         SetValueEx(self.reg_key, "default_directory", 1, REG_SZ, str(self.default_directory.get()))
         SetValueEx(self.reg_key, "default_password", 1, REG_SZ, str(self.default_password.get()))
         SetValueEx(self.reg_key, "auto_restart", 1, REG_SZ, str(self.auto_restart.get()))
 
     def get_reg_vars(self):
-        #self.start_plone.set(int(QueryValueEx(self.reg_key, "start_plone")[0]))
         self.make_shortcut.set(int(QueryValueEx(self.reg_key, "make_shortcut")[0]))
         self.default_directory.set(int(QueryValueEx(self.reg_key, "default_directory")[0]))
         self.default_password.set(int(QueryValueEx(self.reg_key, "default_password")[0]))
@@ -378,9 +371,6 @@ class WindowsPloneInstaller:
         self.install_status = "complete"
         self.okaybutton.configure(state="enabled", text="Finish")
 
-        #if self.start_plone.get():
-        #    self.log("When the installer finishes, give Plone a minute to start then see localhost:8080 in your browser to see Plone in action.")
-
         if self.make_shortcut.get():
             self.create_shortcut()
 
@@ -391,19 +381,6 @@ class WindowsPloneInstaller:
 
         CloseKey(self.reg_key)
         DeleteKey(HKEY_CURRENT_USER, self.plone_key)
-
-    #def run_plone(self):
-    #    with open(self.base_path + "\\PS\\start_plone.ps1", "a") as start_script:
-    #        if self.build_number >= self.required_build:
-    #            start_script.write('\nSet-Location bash')
-    #            start_script.write('\nStart-Process -FilePath "bash" -ArgumentList ("-c",  "./launch.sh\\ start_plone")') #this line will start plone in WSL
-    #        else:
-    #            self.install_directory = self.install_directory.replace(" ","` ") #backtick escapes any space characters in the installation path in PowerShell
-    #            start_script.write("\nStart-Process -FilePath 'powershell' -ArgumentList ('"+self.install_directory+"\\Plone\\bin\\instance fg')")
- 
-   #         start_script.close()
-
-    #    sp.Popen(["C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe", "-WindowStyle", "Hidden", ". "+self.base_path+"\\PS\\start_plone.ps1"])
 
     def create_shortcut(self):
         if self.build_number >= self.required_build:
