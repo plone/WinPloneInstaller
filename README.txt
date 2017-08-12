@@ -1,6 +1,8 @@
 Please see the github repo for documentation! It is in the wiki (https://github.com/lucid-0/WinPloneInstaller/wiki)
 (a copy of the reStructuredText is also included in the /docs folder)
 
+The project will be understood through WinPloneInstaller.py and its documentation, the WinPloneInstaller class within is certainly the "main" project code.
+
 Steps for creating installer EXE with PyInstaller:
 	Get python (currently building on 3.5.x)
 	Make sure pip is installed and accessible from powershell

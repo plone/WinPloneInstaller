@@ -9,6 +9,7 @@ from tkinter.ttk import *
 import tkinter.filedialog as filedialog
 from PIL import Image, ImageTk
 import winsound
+import threading
 
 class WindowsPloneInstaller:
 
@@ -59,6 +60,10 @@ class WindowsPloneInstaller:
         self.build_number = int(QueryValueEx(self.reg_key, "build_number")[0])
 
     def play_sound(self, sound_name):
+        t = threading.Thread(target=self.play_sound_helper, args=(sound_name,))
+        t.start()
+
+    def play_sound_helper(self, sound_name):
         winsound.PlaySound(self.base_path+"\\resources\\"+sound_name, winsound.SND_FILENAME)
 
     def init_GUI(self):
