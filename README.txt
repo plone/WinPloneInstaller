@@ -1,3 +1,17 @@
+Plone Installer for Windows
+===========================
+
+The Plone installer for Windows will do one of two things:
+
+- for Windows 10 and later: install the Windows Subsystem for Linux (WSL) then run the Plone unified installer
+- for earlier Windows versions: install the requirements for then run the Plone simple buildout
+
+The current executable for the Plone installer for Windows is available in https://github.com/plone/WinPloneInstaller/tree/master/dist
+
+Please file bug reports in https://github.com/plone/WinPloneInstaller/issues
+
+Development Notes
+-----------------
 Please see the github repo for documentation! It is in the wiki (https://github.com/lucid-0/WinPloneInstaller/wiki)
 (a copy of the reStructuredText is also included in the /docs folder)
 
