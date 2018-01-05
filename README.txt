@@ -1,6 +1,10 @@
 Plone Installer for Windows
 ===========================
 
+Currently installs Plone 5.0.8
+
+You'll find WinPloneInstaller.exe in the /dist/ folder of the GitHub repo
+
 The Plone installer for Windows will do one of two things:
 
 - for Windows 10 and later: install the Windows Subsystem for Linux (WSL) then run the Plone unified installer
