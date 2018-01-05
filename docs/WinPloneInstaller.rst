@@ -1,7 +1,7 @@
 WinPloneInstaller.py
 ====================
 
-WinPloneInstaller.py contains the main logic of the installer. `PyInstaller <https://github.com/lucid-0/WinPloneInstaller/wiki/PyInstaller>`_ is used to convert this file to an executable that includes its dependencies.
+WinPloneInstaller.py contains the main logic of the installer. `PyInstaller <https://github.com/plone/WinPloneInstaller/wiki/PyInstaller>`_ is used to convert this file to an executable that includes its dependencies.
 
 See the name and description of each function as they appear in the WinPloneInstaller class below.
 
@@ -21,7 +21,7 @@ There are plenty of comments inside the file to help understand what it is doing
 
   * If Standard Buildout is chosen
 
-    * Install `Chocolatey <https://github.com/lucid-0/WinPloneInstaller/wiki/chocolatey>`_ (a software manager for Windows)
+    * Install `Chocolatey <https://github.com/plone/WinPloneInstaller/wiki/chocolatey>`_ (a software manager for Windows)
     * Use to install Python, Git, etc.
     * Run buildout
 
