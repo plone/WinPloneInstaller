@@ -5,6 +5,5 @@ Set-Location $plonePath
 . ".\PS\log.ps1"
 Set-Location bash
 log("Calling Plone installation script in Bash")
-#bash -c "./launch.sh install_plone"
 $bash = $(Start-Process -FilePath "bash" -ArgumentList ("-c","./launch.sh\ install_plone") -PassThru);
 $bash | Wait-Process;

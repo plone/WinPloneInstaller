@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['WinPloneInstaller.py'],
-             pathex=['C:\\Users\\Kyle\\Documents\\GitHub\\WinPloneInstaller'],
+             pathex=['C:\\Users\\Kyle\\Desktop\\Plone\\WinPloneInstaller'],
              binaries=[],
              datas=[('./PS/*', './PS'), ('./bash/*', './bash'), ('./resources/*', './resources')],
              hiddenimports=[],
@@ -25,4 +25,5 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
+          runtime_tmpdir=None,
           console=False , icon='resources\\plone.ico')
